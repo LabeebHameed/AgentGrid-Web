@@ -1,0 +1,96 @@
+import type { ApprovalRequest, ResolvedApproval } from "./types";
+
+const AGENT = "did:key:z6MkvS1cqyiGLD6vMgccHakJ1GZK9mfkQnjbxZdxTyW8X23b";
+const inMinutes = (m: number): string => new Date(Date.now() + m * 60_000).toISOString();
+const minutesAgo = (m: number): string => new Date(Date.now() - m * 60_000).toISOString();
+
+export const seedPending = (): ApprovalRequest[] => [
+  {
+    id: "apr_3f9a21",
+    agent: AGENT,
+    capability: "pay",
+    action: "pay.charge",
+    amountMinor: 1400,
+    currency: "USD",
+    merchant: "acme-analytics.com",
+    targetService: "acme-analytics.com",
+    targetDomain: null,
+    rationale: "Upgrade the analytics plan to export the Q2 dataset the user asked for.",
+    nonce: "n_8c41d0a7e2",
+    createdAt: minutesAgo(1),
+    expiresAt: inMinutes(4),
+  },
+  {
+    id: "apr_7b1c88",
+    agent: AGENT,
+    capability: "browse",
+    action: "browse.login.user-owned",
+    amountMinor: null,
+    currency: null,
+    merchant: null,
+    targetService: "user-owned",
+    targetDomain: "dashboard.stripe.com",
+    rationale: "Read this month's payout total to answer the user's question.",
+    nonce: "n_1a77be93f0",
+    createdAt: minutesAgo(3),
+    expiresAt: inMinutes(9),
+  },
+  {
+    id: "apr_c4e012",
+    capability: "deploy",
+    agent: AGENT,
+    action: "deploy.publish",
+    amountMinor: null,
+    currency: null,
+    merchant: null,
+    targetService: "aegis-cloud",
+    targetDomain: "status-bot.vercel.app",
+    rationale: "Publish the status page the user requested to *.vercel.app (≈$0/mo).",
+    nonce: "n_55b9c12d4a",
+    createdAt: minutesAgo(6),
+    expiresAt: inMinutes(20),
+  },
+];
+
+export const seedHistory = (): ResolvedApproval[] => [
+  {
+    request: {
+      id: "apr_91aa02",
+      agent: AGENT,
+      capability: "pay",
+      action: "pay.charge",
+      amountMinor: 900,
+      currency: "USD",
+      merchant: "openrouter.ai",
+      targetService: "openrouter.ai",
+      targetDomain: null,
+      rationale: "Top up API credits to finish the batch the user started.",
+      nonce: "n_22aa",
+      createdAt: minutesAgo(58),
+      expiresAt: minutesAgo(53),
+    },
+    decision: "approved",
+    reason: "approved by operator",
+    resolvedAt: minutesAgo(57),
+  },
+  {
+    request: {
+      id: "apr_44de71",
+      agent: AGENT,
+      capability: "pay",
+      action: "pay.charge",
+      amountMinor: 8800,
+      currency: "USD",
+      merchant: "unknown-vendor.io",
+      targetService: "unknown-vendor.io",
+      targetDomain: null,
+      rationale: "Purchase a dataset from a vendor not seen before.",
+      nonce: "n_77bd",
+      createdAt: minutesAgo(126),
+      expiresAt: minutesAgo(121),
+    },
+    decision: "denied",
+    reason: "unfamiliar vendor, amount above comfort",
+    resolvedAt: minutesAgo(124),
+  },
+];

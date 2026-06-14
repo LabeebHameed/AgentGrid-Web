@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/*
+ * Aegis Approvals — design tokens.
+ * Security-grade, near-black, semantic color ONLY (no decorative gradients/glows).
+ * Risk reads through color; amounts/DIDs/nonces read through the monospace face.
+ * Contrast targets WCAG 2.1 AA (>= 4.5:1 body, >= 3:1 large/UI) on the dark base.
+ */
+:root {
+  --bg: #08080a;
+  --surface: #0f0f12;
+  --surface-2: #15151a;
+  --surface-3: #1c1c22;
+
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #f5f5f7; /* ~16:1 on --bg */
+  --muted: #a8a8b3; /* ~7:1  — body secondary */
+  --subtle: #82828e; /* ~4.6:1 — large/secondary only */
+
+  /* Semantic signal. Tuned light enough to clear 4.5:1 on the dark base. */
+  --ok: #4cd68a;
+  --ok-dim: rgba(76, 214, 138, 0.12);
+  --warn: #f0b132;
+  --warn-dim: rgba(240, 177, 50, 0.12);
+  --danger: #f4736f;
+  --danger-dim: rgba(244, 115, 111, 0.12);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Monospace face for the cryptographic / numeric truth of a request. */
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+
+/* A receipt-style perforation between "what the agent wants" and "your decision". */
+.perforation {
+  height: 1px;
+  background-image: linear-gradient(to right, var(--line-strong) 50%, transparent 50%);
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+}
+
+/* Visible, accessible focus for every interactive element. */
+*:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
