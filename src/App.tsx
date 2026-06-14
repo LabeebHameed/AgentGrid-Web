@@ -10,10 +10,14 @@ import { History } from "./components/History";
 
 type View = "inbox" | "history";
 
-// Live against the Aegis approval bridge when VITE_AEGIS_API points at it
-// (e.g. http://localhost:8787); otherwise the self-contained seeded demo.
+// The app is part of Aegis: by default it talks to the bridge that serves it,
+// same-origin (`/api/...`). VITE_AEGIS_API points it at a bridge on another
+// origin; VITE_AEGIS_DEMO=1 runs the self-contained seeded demo with no backend.
 const apiBase = import.meta.env.VITE_AEGIS_API as string | undefined;
-const api: ApprovalApi = apiBase !== undefined && apiBase !== "" ? new HttpApi(apiBase) : new SeedApi();
+const demo = (import.meta.env.VITE_AEGIS_DEMO as string | undefined) === "1";
+const api: ApprovalApi = demo
+  ? new SeedApi()
+  : new HttpApi(apiBase !== undefined && apiBase !== "" ? apiBase : "");
 const AGENT = "did:key:z6MkvS1cqyiGLD6vMgccHakJ1GZK9mfkQnjbxZdxTyW8X23b";
 
 const EmptyInbox = () => (
