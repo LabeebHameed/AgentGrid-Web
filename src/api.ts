@@ -9,12 +9,14 @@ import type {
   AuditView,
   Capability,
   ConnectSnippet,
+  DevicesView,
   GovernanceOverview,
   IdentityView,
   LicenseStatus,
   LoadedConfig,
   MandateView,
   PolicyDecisionView,
+  ProvidersView,
   ResolvedApproval,
   Verdict,
   VaultEntryView,
@@ -85,13 +87,19 @@ export interface ApprovalApi {
     requestedMinor: number;
   }): Promise<SetCardLimitsResult>;
 
-  // ─── Product config / licensing ───────────────────────────────────────────
+  // ─── Product config / licensing ─────────────────────────────────────
   getConfig(): Promise<LoadedConfig>;
   saveConfig(config: AppConfig): Promise<{ ok: boolean; errors?: readonly string[]; restartRequired?: boolean }>;
   getLicense(): Promise<LicenseStatus>;
   activateLicense(params: { key: string }): Promise<{ ok: boolean; reason?: string }>;
   deactivateLicense(): Promise<{ ok: boolean }>;
   getConnect(): Promise<ConnectSnippet>;
+  /** Provider connection status for the Providers screen (task 4.4). */
+  getProviders(): Promise<ProvidersView>;
+  /** Linked phone devices for the Devices screen (task 4.5). */
+  getDevices(): Promise<DevicesView>;
+  /** Unlink a specific device by token. */
+  unlinkDevice(params: { token: string }): Promise<{ ok: boolean }>;
 }
 
 export class SeedApi implements ApprovalApi {
@@ -234,6 +242,23 @@ export class SeedApi implements ApprovalApi {
   }
   async getConnect(): Promise<ConnectSnippet> {
     return { snippet: { mcpServers: { aegis: { command: "npx", args: ["tsx", "packages/server/src/main.ts"] } } } };
+  }
+  async getProviders(): Promise<ProvidersView> {
+    return {
+      providers: [
+        { kind: "browser", label: "Playwright browser", description: "Lets the agent navigate and interact with websites.", connected: true, detail: "headless", envKey: "(built-in)" },
+        { kind: "email", label: "AgentMail inbox", description: "Gives the agent a real email address for verifications and messages.", connected: false, detail: null, envKey: "AGENTMAIL_API_KEY" },
+        { kind: "sms", label: "Twilio SMS", description: "Lets the agent send and receive SMS messages.", connected: false, detail: null, envKey: "TWILIO_ACCOUNT_SID" },
+        { kind: "cloud", label: "Vercel deployments", description: "Lets the agent deploy code to Vercel.", connected: false, detail: null, envKey: "VERCEL_TOKEN" },
+        { kind: "payments", label: "Stripe Issuing card", description: "A real virtual card the agent uses for payments (operator-issued).", connected: false, detail: null, envKey: "STRIPE_API_KEY" },
+      ],
+    };
+  }
+  async getDevices(): Promise<DevicesView> {
+    return { devices: [], enrollQrPayload: "https://aegis.local/enroll" };
+  }
+  async unlinkDevice(_params: { token: string }): Promise<{ ok: boolean }> {
+    return { ok: true };
   }
 }
 
@@ -425,5 +450,20 @@ export class HttpApi implements ApprovalApi {
     const res = await fetch(`${this.#base}/api/connect`);
     if (!res.ok) throw new Error(`connect fetch failed: ${res.status}`);
     return (await res.json()) as ConnectSnippet;
+  }
+  async getProviders(): Promise<ProvidersView> {
+    const res = await fetch(`${this.#base}/api/providers`);
+    if (!res.ok) throw new Error(`providers fetch failed: ${res.status}`);
+    return (await res.json()) as ProvidersView;
+  }
+  async getDevices(): Promise<DevicesView> {
+    const res = await fetch(`${this.#base}/api/devices`);
+    if (!res.ok) throw new Error(`devices fetch failed: ${res.status}`);
+    return (await res.json()) as DevicesView;
+  }
+  async unlinkDevice(params: { token: string }): Promise<{ ok: boolean }> {
+    const res = await fetch(`${this.#base}/api/devices/${encodeURIComponent(params.token)}/unlink`, { method: "POST" });
+    if (!res.ok) throw new Error(`unlink failed: ${res.status}`);
+    return (await res.json()) as { ok: boolean };
   }
 }

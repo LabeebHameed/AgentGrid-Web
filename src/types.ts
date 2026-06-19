@@ -276,6 +276,36 @@ export interface ConnectSnippet {
   readonly snippet: { readonly mcpServers: Record<string, { command: string; args: string[] }> };
 }
 
+// ─── Providers (4.4) ─────────────────────────────────────────────────────────
+
+export type ProviderKind = "browser" | "email" | "sms" | "cloud" | "payments";
+
+export interface ProviderStatus {
+  readonly kind: ProviderKind;
+  readonly label: string;
+  readonly description: string;
+  readonly connected: boolean;
+  readonly detail: string | null; // e.g. last4 for a card, domain for email
+  readonly envKey: string;        // env var the operator must set
+}
+
+export interface ProvidersView {
+  readonly providers: readonly ProviderStatus[];
+}
+
+// ─── Devices (4.5) ───────────────────────────────────────────────────────────
+
+export interface DeviceEntry {
+  readonly token: string;
+  readonly operatorDid: string;
+  readonly enrolledAt: string;
+}
+
+export interface DevicesView {
+  readonly devices: readonly DeviceEntry[];
+  readonly enrollQrPayload: string; // URL/payload to render as a QR code
+}
+
 /** Triage tier, derived from the request — drives the visual weight of a card. */
 export type RiskTier = "elevated" | "high";
 

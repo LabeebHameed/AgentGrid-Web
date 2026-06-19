@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Inbox, History as HistoryIcon, Bot, ShieldQuestion, LayoutDashboard, Landmark, Settings as SettingsIcon } from "lucide-react";
+import {
+  ShieldCheck,
+  Inbox,
+  History as HistoryIcon,
+  Bot,
+  ShieldQuestion,
+  LayoutDashboard,
+  Landmark,
+  Settings as SettingsIcon,
+  Plug,
+  Smartphone,
+  KeyRound,
+} from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
-import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, ResolvedApproval } from "./types";
+import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval } from "./types";
 import { shortDid } from "./lib/format";
 import { useMediaQuery, useNow } from "./lib/useMediaQuery";
 import { InboxList } from "./components/InboxList";
@@ -10,8 +22,11 @@ import { History } from "./components/History";
 import { Dashboard } from "./components/Dashboard";
 import { GovernanceConsole } from "./components/Governance";
 import { Settings } from "./components/Settings";
+import { ProvidersScreen } from "./components/Providers";
+import { DevicesScreen } from "./components/Devices";
+import { SetupWizard, useWizardVisible } from "./components/Wizard";
 
-type View = "governance" | "dashboard" | "inbox" | "history" | "settings";
+type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices";
 
 // The app is part of Aegis: by default it talks to the bridge that serves it,
 // same-origin (`/api/...`). VITE_AEGIS_API points it at a bridge on another
@@ -32,6 +47,30 @@ const EmptyInbox = () => (
     <p className="mt-1 max-w-xs text-sm text-[var(--muted)]">
       Nothing needs you right now. The agent keeps acting within its mandate — you'll only be pulled in for the consequential.
     </p>
+  </div>
+);
+
+// Unlicensed-state banner (task 4.8): shown prominently when enforcement is on
+// and the license is not operable.
+const UnlicensedBanner = ({ onGoToLicense }: { onGoToLicense: () => void }) => (
+  <div
+    className="mb-5 flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border px-4 py-3"
+    style={{ borderColor: "var(--danger)", background: "var(--danger-dim)" }}
+  >
+    <div className="flex items-center gap-3">
+      <KeyRound className="h-5 w-5 shrink-0" style={{ color: "var(--danger)" }} strokeWidth={1.75} aria-hidden />
+      <div>
+        <p className="text-sm font-semibold" style={{ color: "var(--danger)" }}>Agent gated — no active license</p>
+        <p className="text-xs" style={{ color: "var(--danger)", opacity: 0.8 }}>All tools are blocked until you activate a license key.</p>
+      </div>
+    </div>
+    <button
+      onClick={onGoToLicense}
+      className="shrink-0 rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-semibold cursor-pointer"
+      style={{ background: "var(--danger)", color: "var(--bg)" }}
+    >
+      Activate
+    </button>
   </div>
 );
 
@@ -75,8 +114,12 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<View>("governance");
   const [busy, setBusy] = useState(false);
+  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
+
+  // First-run wizard
+  const [wizardVisible, dismissWizard] = useWizardVisible();
 
   const refresh = useCallback(async () => {
     const [p, h, ag, ac] = await Promise.all([
@@ -91,15 +134,15 @@ export default function App() {
     setActivity(ac);
   }, []);
 
+  // Periodically check license status for the unlicensed-state banner (task 4.8)
+  const refreshLicense = useCallback(async () => {
+    try { setLicenseStatus(await api.getLicense()); } catch { /* ignore */ }
+  }, []);
+
   const freeze = useCallback(
     async (params: { agentDid: string; reason: string }) => {
       setBusy(true);
-      try {
-        await api.freeze(params);
-        await refresh();
-      } finally {
-        setBusy(false);
-      }
+      try { await api.freeze(params); await refresh(); } finally { setBusy(false); }
     },
     [refresh],
   );
@@ -107,25 +150,19 @@ export default function App() {
   const unfreeze = useCallback(
     async (params: { agentDid: string }) => {
       setBusy(true);
-      try {
-        await api.unfreeze(params);
-        await refresh();
-      } finally {
-        setBusy(false);
-      }
+      try { await api.unfreeze(params); await refresh(); } finally { setBusy(false); }
     },
     [refresh],
   );
 
-  // Poll the bridge so a STEP_UP raised by the agent surfaces here within a
-  // couple of seconds without a manual reload.
   useEffect(() => {
     void refresh();
-    const handle = setInterval(() => void refresh(), 2000);
-    return () => clearInterval(handle);
-  }, [refresh]);
+    void refreshLicense();
+    const handleRefresh = setInterval(() => void refresh(), 2000);
+    const handleLicense = setInterval(() => void refreshLicense(), 10000);
+    return () => { clearInterval(handleRefresh); clearInterval(handleLicense); };
+  }, [refresh, refreshLicense]);
 
-  // Keep a valid selection: default to the first pending request.
   useEffect(() => {
     if (pending.length === 0) {
       setSelectedId(null);
@@ -144,17 +181,29 @@ export default function App() {
         await api.decide({ id: selected.id, decision, reason });
         setSelectedId(null);
         await refresh();
-      } finally {
-        setBusy(false);
-      }
+      } finally { setBusy(false); }
     },
     [selected, refresh],
   );
 
   const mobileShowCard = !isLg && selected !== null && view === "inbox";
 
+  // Show the unlicensed banner only when enforcement is on and not operable
+  const showUnlicensedBanner =
+    licenseStatus !== null &&
+    licenseStatus.mode === "enforced" &&
+    !licenseStatus.operable;
+
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* First-run wizard overlay */}
+      {wizardVisible && (
+        <SetupWizard
+          api={api}
+          onDone={() => { dismissWizard(); }}
+        />
+      )}
+
       {/* Desktop rail */}
       <aside
         className="hidden w-60 shrink-0 flex-col border-r px-4 py-6 lg:flex"
@@ -171,6 +220,13 @@ export default function App() {
           <NavButton active={view === "dashboard"} onClick={() => setView("dashboard")} label="Dashboard" icon={<LayoutDashboard className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "inbox"} onClick={() => setView("inbox")} label="Inbox" count={pending.length} icon={<Inbox className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "history"} onClick={() => setView("history")} label="History" icon={<HistoryIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
+
+          {/* Settings section */}
+          <div className="mt-4 mb-1 px-3">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--subtle)]">Setup</p>
+          </div>
+          <NavButton active={view === "providers"} onClick={() => setView("providers")} label="Providers" icon={<Plug className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
+          <NavButton active={view === "devices"} onClick={() => setView("devices")} label="Devices" icon={<Smartphone className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "settings"} onClick={() => setView("settings")} label="Settings" icon={<SettingsIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
         </nav>
 
@@ -191,25 +247,42 @@ export default function App() {
         <header className="flex items-center justify-between border-b px-5 py-4 lg:hidden" style={{ borderColor: "var(--line)" }}>
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-[var(--text)]" strokeWidth={1.75} aria-hidden />
-            <span className="font-semibold tracking-tight text-[var(--text)]">Aegis Approvals</span>
+            <span className="font-semibold tracking-tight text-[var(--text)]">Aegis</span>
           </div>
           <div className="flex gap-1 rounded-[var(--radius-md)] p-1" style={{ background: "var(--surface-2)" }}>
-            <button onClick={() => setView("governance")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "governance" ? "var(--surface-3)" : "transparent", color: view === "governance" ? "var(--text)" : "var(--muted)" }}>Governance</button>
-            <button onClick={() => setView("dashboard")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "dashboard" ? "var(--surface-3)" : "transparent", color: view === "dashboard" ? "var(--text)" : "var(--muted)" }}>Dashboard</button>
-            <button onClick={() => setView("inbox")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "inbox" ? "var(--surface-3)" : "transparent", color: view === "inbox" ? "var(--text)" : "var(--muted)" }}>Inbox</button>
-            <button onClick={() => setView("history")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "history" ? "var(--surface-3)" : "transparent", color: view === "history" ? "var(--text)" : "var(--muted)" }}>History</button>
-            <button onClick={() => setView("settings")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "settings" ? "var(--surface-3)" : "transparent", color: view === "settings" ? "var(--text)" : "var(--muted)" }}>Settings</button>
+            {(["governance", "dashboard", "inbox", "history", "providers", "devices", "settings"] as View[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium cursor-pointer capitalize"
+                style={{
+                  background: view === v ? "var(--surface-3)" : "transparent",
+                  color: view === v ? "var(--text)" : "var(--muted)",
+                }}
+              >
+                {v === "governance" ? "Gov" : v === "dashboard" ? "Dash" : v === "providers" ? "Prov" : v === "devices" ? "Dev" : v === "settings" ? "Config" : v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
           </div>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
+            {/* Unlicensed-state UX banner (task 4.8) */}
+            {showUnlicensedBanner && (
+              <UnlicensedBanner onGoToLicense={() => setView("settings")} />
+            )}
+
             {view === "settings" ? (
               <Settings api={api} />
             ) : view === "governance" ? (
               <GovernanceConsole api={api} agents={agents} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
             ) : view === "dashboard" ? (
               <Dashboard agents={agents} activity={activity} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
+            ) : view === "providers" ? (
+              <ProvidersScreen api={api} />
+            ) : view === "devices" ? (
+              <DevicesScreen api={api} />
             ) : view === "history" ? (
               <>
                 <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text)]">Decision history</h1>
