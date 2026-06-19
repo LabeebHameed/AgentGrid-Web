@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Inbox, History as HistoryIcon, Bot, ShieldQuestion } from "lucide-react";
+import { ShieldCheck, Inbox, History as HistoryIcon, Bot, ShieldQuestion, LayoutDashboard, Landmark } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
-import type { ApprovalDecision, ApprovalRequest, ResolvedApproval } from "./types";
+import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, ResolvedApproval } from "./types";
 import { shortDid } from "./lib/format";
 import { useMediaQuery, useNow } from "./lib/useMediaQuery";
 import { InboxList } from "./components/InboxList";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { History } from "./components/History";
+import { Dashboard } from "./components/Dashboard";
+import { GovernanceConsole } from "./components/Governance";
 
-type View = "inbox" | "history";
+type View = "governance" | "dashboard" | "inbox" | "history";
 
 // The app is part of Aegis: by default it talks to the bridge that serves it,
 // same-origin (`/api/...`). VITE_AEGIS_API points it at a bridge on another
@@ -67,17 +69,52 @@ const NavButton = ({
 export default function App() {
   const [pending, setPending] = useState<readonly ApprovalRequest[]>([]);
   const [history, setHistory] = useState<readonly ResolvedApproval[]>([]);
+  const [agents, setAgents] = useState<readonly AgentSummary[]>([]);
+  const [activity, setActivity] = useState<readonly ActivityEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<View>("inbox");
+  const [view, setView] = useState<View>("governance");
   const [busy, setBusy] = useState(false);
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
 
   const refresh = useCallback(async () => {
-    const [p, h] = await Promise.all([api.listPending(), api.listHistory()]);
+    const [p, h, ag, ac] = await Promise.all([
+      api.listPending(),
+      api.listHistory(),
+      api.listAgents(),
+      api.listActivity(),
+    ]);
     setPending(p);
     setHistory(h);
+    setAgents(ag);
+    setActivity(ac);
   }, []);
+
+  const freeze = useCallback(
+    async (params: { agentDid: string; reason: string }) => {
+      setBusy(true);
+      try {
+        await api.freeze(params);
+        await refresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh],
+  );
+
+  const unfreeze = useCallback(
+    async (params: { agentDid: string }) => {
+      setBusy(true);
+      try {
+        await api.unfreeze(params);
+        await refresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh],
+  );
 
   // Poll the bridge so a STEP_UP raised by the agent surfaces here within a
   // couple of seconds without a manual reload.
@@ -129,6 +166,8 @@ export default function App() {
         <p className="mb-7 mt-1 px-2 text-xs text-[var(--subtle)]">Approvals</p>
 
         <nav className="flex flex-col gap-1">
+          <NavButton active={view === "governance"} onClick={() => setView("governance")} label="Governance" icon={<Landmark className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
+          <NavButton active={view === "dashboard"} onClick={() => setView("dashboard")} label="Dashboard" icon={<LayoutDashboard className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "inbox"} onClick={() => setView("inbox")} label="Inbox" count={pending.length} icon={<Inbox className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "history"} onClick={() => setView("history")} label="History" icon={<HistoryIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
         </nav>
@@ -153,6 +192,8 @@ export default function App() {
             <span className="font-semibold tracking-tight text-[var(--text)]">Aegis Approvals</span>
           </div>
           <div className="flex gap-1 rounded-[var(--radius-md)] p-1" style={{ background: "var(--surface-2)" }}>
+            <button onClick={() => setView("governance")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "governance" ? "var(--surface-3)" : "transparent", color: view === "governance" ? "var(--text)" : "var(--muted)" }}>Governance</button>
+            <button onClick={() => setView("dashboard")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "dashboard" ? "var(--surface-3)" : "transparent", color: view === "dashboard" ? "var(--text)" : "var(--muted)" }}>Dashboard</button>
             <button onClick={() => setView("inbox")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "inbox" ? "var(--surface-3)" : "transparent", color: view === "inbox" ? "var(--text)" : "var(--muted)" }}>Inbox</button>
             <button onClick={() => setView("history")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "history" ? "var(--surface-3)" : "transparent", color: view === "history" ? "var(--text)" : "var(--muted)" }}>History</button>
           </div>
@@ -160,7 +201,11 @@ export default function App() {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-            {view === "history" ? (
+            {view === "governance" ? (
+              <GovernanceConsole api={api} agents={agents} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
+            ) : view === "dashboard" ? (
+              <Dashboard agents={agents} activity={activity} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
+            ) : view === "history" ? (
               <>
                 <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text)]">Decision history</h1>
                 <p className="mb-6 text-sm text-[var(--muted)]">Every approval and denial, signed and recorded.</p>

@@ -1,5 +1,46 @@
-import type { ApprovalDecision, ApprovalRequest, ResolvedApproval } from "./types";
-import { seedHistory, seedPending } from "./seed";
+import type {
+  ActivityEntry,
+  ActivityResponse,
+  AgentSummary,
+  ApprovalDecision,
+  ApprovalRequest,
+  AuditExport,
+  AuditView,
+  Capability,
+  GovernanceOverview,
+  IdentityView,
+  MandateView,
+  PolicyDecisionView,
+  ResolvedApproval,
+  Verdict,
+  VaultEntryView,
+  VirtualCardView,
+} from "./types";
+import {
+  seedActivity,
+  seedActivityResponse,
+  seedAgents,
+  seedAudit,
+  seedCards,
+  seedGovernanceOverview,
+  seedHistory,
+  seedIdentity,
+  seedMandates,
+  seedPending,
+  seedPolicy,
+  seedVault,
+} from "./seed";
+
+/** Optional filter for the policy decision feed (R3.6). */
+export interface PolicyFilter {
+  readonly verdict?: Verdict;
+  readonly capability?: Capability;
+}
+
+/** Outcome of a set-cap control request (R4.5–R4.7). */
+export type SetCardLimitsResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: string };
 
 /**
  * The boundary to the Aegis approval transport. The MVP runs against an in-browser
@@ -11,11 +52,39 @@ export interface ApprovalApi {
   listPending(): Promise<readonly ApprovalRequest[]>;
   listHistory(): Promise<readonly ResolvedApproval[]>;
   decide(params: { id: string; decision: ApprovalDecision; reason: string }): Promise<void>;
+  /** The live activity feed — recent decisions, actions, and approvals. */
+  listActivity(): Promise<readonly ActivityEntry[]>;
+  /** Every agent with its live freeze state (the kill switch view). */
+  listAgents(): Promise<readonly AgentSummary[]>;
+  /** Engage the kill switch: halt every consequential action by this agent. */
+  freeze(params: { agentDid: string; reason: string }): Promise<void>;
+  /** Lift the freeze: let the agent resume acting within its mandate. */
+  unfreeze(params: { agentDid: string }): Promise<void>;
+
+  // ─── Governance read model (operator-authenticated) ───────────────────────
+  getOverview(): Promise<GovernanceOverview>;
+  getMandates(): Promise<readonly MandateView[]>;
+  getPolicy(filter?: PolicyFilter): Promise<readonly PolicyDecisionView[]>;
+  getCards(): Promise<readonly VirtualCardView[]>;
+  getVault(): Promise<readonly VaultEntryView[]>;
+  getAudit(): Promise<AuditView>;
+  exportAudit(): Promise<AuditExport>;
+  getIdentity(): Promise<IdentityView>;
+  getActivity(): Promise<ActivityResponse>;
+  /** Revoke a mandate (R2.6, R2.7). */
+  revokeMandate(params: { mandateId: string }): Promise<void>;
+  /** Set a per-transaction / per-period card cap (R4.5–R4.7). */
+  setCardLimits(params: {
+    handle: string;
+    field: "perTransaction" | "perPeriod";
+    requestedMinor: number;
+  }): Promise<SetCardLimitsResult>;
 }
 
 export class SeedApi implements ApprovalApi {
   #pending: ApprovalRequest[] = seedPending();
   #history: ResolvedApproval[] = seedHistory();
+  #agents: AgentSummary[] = seedAgents();
 
   async listPending(): Promise<readonly ApprovalRequest[]> {
     return [...this.#pending];
@@ -33,6 +102,95 @@ export class SeedApi implements ApprovalApi {
       { request, decision: params.decision, reason: params.reason, resolvedAt: new Date().toISOString() },
       ...this.#history,
     ];
+  }
+
+  async listActivity(): Promise<readonly ActivityEntry[]> {
+    return seedActivity();
+  }
+
+  async listAgents(): Promise<readonly AgentSummary[]> {
+    return [...this.#agents];
+  }
+
+  async freeze(params: { agentDid: string; reason: string }): Promise<void> {
+    this.#agents = this.#agents.map((a) =>
+      a.did === params.agentDid
+        ? { ...a, status: { frozen: true, reason: params.reason, since: new Date().toISOString() } }
+        : a,
+    );
+  }
+
+  async unfreeze(params: { agentDid: string }): Promise<void> {
+    this.#agents = this.#agents.map((a) =>
+      a.did === params.agentDid ? { ...a, status: { frozen: false, reason: null, since: null } } : a,
+    );
+  }
+
+  #mandates: MandateView[] = seedMandates();
+  #cards: VirtualCardView[] = seedCards();
+
+  async getOverview(): Promise<GovernanceOverview> {
+    const frozen = this.#agents[0]?.status ?? { frozen: false, reason: null, since: null };
+    return seedGovernanceOverview(frozen);
+  }
+  async getMandates(): Promise<readonly MandateView[]> {
+    return [...this.#mandates];
+  }
+  async getPolicy(filter?: PolicyFilter): Promise<readonly PolicyDecisionView[]> {
+    return seedPolicy().filter(
+      (d) =>
+        (filter?.verdict === undefined || d.verdict === filter.verdict) &&
+        (filter?.capability === undefined || d.capability === filter.capability),
+    );
+  }
+  async getCards(): Promise<readonly VirtualCardView[]> {
+    return [...this.#cards];
+  }
+  async getVault(): Promise<readonly VaultEntryView[]> {
+    return seedVault();
+  }
+  async getAudit(): Promise<AuditView> {
+    return seedAudit();
+  }
+  async exportAudit(): Promise<AuditExport> {
+    const audit = seedAudit();
+    return {
+      agentDid: this.#agents[0]?.did ?? "did:key:seed",
+      entries: seedActivity(),
+      verified: audit.verified,
+      brokenAtSeq: audit.brokenAtSeq,
+    };
+  }
+  async getIdentity(): Promise<IdentityView> {
+    return seedIdentity();
+  }
+  async getActivity(): Promise<ActivityResponse> {
+    const frozen = this.#agents[0]?.status.frozen === true;
+    return seedActivityResponse(frozen);
+  }
+  async revokeMandate(params: { mandateId: string }): Promise<void> {
+    this.#mandates = this.#mandates.map((m) =>
+      m.id === params.mandateId ? { ...m, status: "revoked" } : m,
+    );
+  }
+  async setCardLimits(params: {
+    handle: string;
+    field: "perTransaction" | "perPeriod";
+    requestedMinor: number;
+  }): Promise<SetCardLimitsResult> {
+    const card = this.#cards.find((c) => c.handle === params.handle);
+    if (card === undefined) return { ok: false, reason: "Unknown card." };
+    if (params.requestedMinor <= 0) {
+      return { ok: false, reason: "Cap must be greater than zero." };
+    }
+    this.#cards = this.#cards.map((c) =>
+      c.handle === params.handle
+        ? params.field === "perTransaction"
+          ? { ...c, perTransactionMinor: params.requestedMinor }
+          : { ...c, perPeriodMinor: params.requestedMinor }
+        : c,
+    );
+    return { ok: true };
   }
 }
 
@@ -58,5 +216,134 @@ export class HttpApi implements ApprovalApi {
       body: JSON.stringify({ decision: params.decision, reason: params.reason }),
     });
     if (!res.ok) throw new Error(`decision failed: ${res.status}`);
+  }
+  async listActivity(): Promise<readonly ActivityEntry[]> {
+    const res = await fetch(`${this.#base}/api/activity`);
+    if (!res.ok) throw new Error(`activity fetch failed: ${res.status}`);
+    return (await res.json()) as ActivityEntry[];
+  }
+  async listAgents(): Promise<readonly AgentSummary[]> {
+    const res = await fetch(`${this.#base}/api/agents`);
+    if (!res.ok) throw new Error(`agents fetch failed: ${res.status}`);
+    return (await res.json()) as AgentSummary[];
+  }
+  async freeze(params: { agentDid: string; reason: string }): Promise<void> {
+    const res = await fetch(`${this.#base}/api/agents/${encodeURIComponent(params.agentDid)}/freeze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: params.reason }),
+    });
+    if (!res.ok) throw new Error(`freeze failed: ${res.status}`);
+  }
+  async unfreeze(params: { agentDid: string }): Promise<void> {
+    const res = await fetch(`${this.#base}/api/agents/${encodeURIComponent(params.agentDid)}/unfreeze`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error(`unfreeze failed: ${res.status}`);
+  }
+
+  // ─── Governance ───────────────────────────────────────────────────────────
+  // The console is served same-origin and has no operator key of its own, so it
+  // obtains a bearer token via the server-signed local session (the bridge holds
+  // the operator key in the vault, exactly as it does to sign approvals).
+  #token: string | null = null;
+  #agentDid: string | null = null;
+
+  async #ensureAgentDid(): Promise<string> {
+    if (this.#agentDid !== null) return this.#agentDid;
+    const agents = await this.listAgents();
+    const did = agents[0]?.did;
+    if (did === undefined) throw new Error("no agent to govern");
+    this.#agentDid = did;
+    return did;
+  }
+
+  async #ensureToken(): Promise<string> {
+    if (this.#token !== null) return this.#token;
+    const res = await fetch(`${this.#base}/api/governance/session/local`, { method: "POST" });
+    if (!res.ok) throw new Error(`session failed: ${res.status}`);
+    const { token } = (await res.json()) as { token: string };
+    this.#token = token;
+    return token;
+  }
+
+  /** GET a governance route, minting/refreshing the session token as needed. */
+  async #govGet<T>(suffix: string): Promise<T> {
+    const did = await this.#ensureAgentDid();
+    const run = async (token: string): Promise<Response> =>
+      fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    let res = await run(await this.#ensureToken());
+    if (res.status === 401) {
+      this.#token = null;
+      res = await run(await this.#ensureToken());
+    }
+    if (!res.ok) throw new Error(`governance ${suffix} failed: ${res.status}`);
+    return (await res.json()) as T;
+  }
+
+  async #govPost<T>(suffix: string, body: unknown): Promise<{ status: number; data: T }> {
+    const did = await this.#ensureAgentDid();
+    const run = async (token: string): Promise<Response> =>
+      fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+    let res = await run(await this.#ensureToken());
+    if (res.status === 401) {
+      this.#token = null;
+      res = await run(await this.#ensureToken());
+    }
+    return { status: res.status, data: (await res.json().catch(() => ({}))) as T };
+  }
+
+  async getOverview(): Promise<GovernanceOverview> {
+    return this.#govGet<GovernanceOverview>("overview");
+  }
+  async getMandates(): Promise<readonly MandateView[]> {
+    return this.#govGet<readonly MandateView[]>("mandates");
+  }
+  async getPolicy(filter?: PolicyFilter): Promise<readonly PolicyDecisionView[]> {
+    const params = new URLSearchParams();
+    if (filter?.verdict !== undefined) params.set("verdict", filter.verdict);
+    if (filter?.capability !== undefined) params.set("capability", filter.capability);
+    const qs = params.toString();
+    return this.#govGet<readonly PolicyDecisionView[]>(`policy${qs === "" ? "" : `?${qs}`}`);
+  }
+  async getCards(): Promise<readonly VirtualCardView[]> {
+    return this.#govGet<readonly VirtualCardView[]>("cards");
+  }
+  async getVault(): Promise<readonly VaultEntryView[]> {
+    return this.#govGet<readonly VaultEntryView[]>("vault");
+  }
+  async getAudit(): Promise<AuditView> {
+    return this.#govGet<AuditView>("audit");
+  }
+  async exportAudit(): Promise<AuditExport> {
+    return this.#govGet<AuditExport>("audit/export");
+  }
+  async getIdentity(): Promise<IdentityView> {
+    return this.#govGet<IdentityView>("identity");
+  }
+  async getActivity(): Promise<ActivityResponse> {
+    return this.#govGet<ActivityResponse>("activity");
+  }
+  async revokeMandate(params: { mandateId: string }): Promise<void> {
+    const { status } = await this.#govPost(`mandates/${encodeURIComponent(params.mandateId)}/revoke`, {});
+    if (status < 200 || status >= 300) throw new Error(`revoke failed: ${status}`);
+  }
+  async setCardLimits(params: {
+    handle: string;
+    field: "perTransaction" | "perPeriod";
+    requestedMinor: number;
+  }): Promise<SetCardLimitsResult> {
+    const { status, data } = await this.#govPost<{ ok?: boolean; reason?: string }>(
+      `cards/${encodeURIComponent(params.handle)}/limits`,
+      { field: params.field, requestedMinor: params.requestedMinor },
+    );
+    if (status >= 200 && status < 300 && data.ok === true) return { ok: true };
+    return { ok: false, reason: data.reason ?? `request failed (${status})` };
   }
 }
