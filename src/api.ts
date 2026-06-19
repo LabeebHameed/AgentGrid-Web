@@ -2,13 +2,17 @@ import type {
   ActivityEntry,
   ActivityResponse,
   AgentSummary,
+  AppConfig,
   ApprovalDecision,
   ApprovalRequest,
   AuditExport,
   AuditView,
   Capability,
+  ConnectSnippet,
   GovernanceOverview,
   IdentityView,
+  LicenseStatus,
+  LoadedConfig,
   MandateView,
   PolicyDecisionView,
   ResolvedApproval,
@@ -23,6 +27,7 @@ import {
   seedAudit,
   seedCards,
   seedGovernanceOverview,
+  seedConfig,
   seedHistory,
   seedIdentity,
   seedMandates,
@@ -79,6 +84,14 @@ export interface ApprovalApi {
     field: "perTransaction" | "perPeriod";
     requestedMinor: number;
   }): Promise<SetCardLimitsResult>;
+
+  // ─── Product config / licensing ───────────────────────────────────────────
+  getConfig(): Promise<LoadedConfig>;
+  saveConfig(config: AppConfig): Promise<{ ok: boolean; errors?: readonly string[]; restartRequired?: boolean }>;
+  getLicense(): Promise<LicenseStatus>;
+  activateLicense(params: { key: string }): Promise<{ ok: boolean; reason?: string }>;
+  deactivateLicense(): Promise<{ ok: boolean }>;
+  getConnect(): Promise<ConnectSnippet>;
 }
 
 export class SeedApi implements ApprovalApi {
@@ -191,6 +204,36 @@ export class SeedApi implements ApprovalApi {
         : c,
     );
     return { ok: true };
+  }
+
+  #config: AppConfig = seedConfig();
+  #entitled = false;
+
+  async getConfig(): Promise<LoadedConfig> {
+    return { config: this.#config, firstRun: false };
+  }
+  async saveConfig(config: AppConfig): Promise<{ ok: boolean; restartRequired?: boolean }> {
+    this.#config = config;
+    return { ok: true, restartRequired: false };
+  }
+  async getLicense(): Promise<LicenseStatus> {
+    return this.#config.license.mode === "disabled"
+      ? { mode: "disabled", operable: true, plan: null, expiresAt: null, reason: "license enforcement disabled (dev/test mode)" }
+      : this.#entitled
+        ? { mode: "enforced", operable: true, plan: "personal", expiresAt: new Date(Date.now() + 30 * 864e5).toISOString(), reason: "licensed" }
+        : { mode: "enforced", operable: false, plan: null, expiresAt: null, reason: "no-entitlement" };
+  }
+  async activateLicense(params: { key: string }): Promise<{ ok: boolean; reason?: string }> {
+    if (params.key.trim() === "") return { ok: false, reason: "a license key is required" };
+    this.#entitled = true;
+    return { ok: true };
+  }
+  async deactivateLicense(): Promise<{ ok: boolean }> {
+    this.#entitled = false;
+    return { ok: true };
+  }
+  async getConnect(): Promise<ConnectSnippet> {
+    return { snippet: { mcpServers: { aegis: { command: "npx", args: ["tsx", "packages/server/src/main.ts"] } } } };
   }
 }
 
@@ -345,5 +388,42 @@ export class HttpApi implements ApprovalApi {
     );
     if (status >= 200 && status < 300 && data.ok === true) return { ok: true };
     return { ok: false, reason: data.reason ?? `request failed (${status})` };
+  }
+
+  // ─── Product config / licensing (unauthenticated, same-origin local routes) ──
+  async getConfig(): Promise<LoadedConfig> {
+    const res = await fetch(`${this.#base}/api/config`);
+    if (!res.ok) throw new Error(`config fetch failed: ${res.status}`);
+    return (await res.json()) as LoadedConfig;
+  }
+  async saveConfig(config: AppConfig): Promise<{ ok: boolean; errors?: readonly string[]; restartRequired?: boolean }> {
+    const res = await fetch(`${this.#base}/api/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config),
+    });
+    return (await res.json()) as { ok: boolean; errors?: readonly string[]; restartRequired?: boolean };
+  }
+  async getLicense(): Promise<LicenseStatus> {
+    const res = await fetch(`${this.#base}/api/license`);
+    if (!res.ok) throw new Error(`license fetch failed: ${res.status}`);
+    return (await res.json()) as LicenseStatus;
+  }
+  async activateLicense(params: { key: string }): Promise<{ ok: boolean; reason?: string }> {
+    const res = await fetch(`${this.#base}/api/license/activate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    return (await res.json()) as { ok: boolean; reason?: string };
+  }
+  async deactivateLicense(): Promise<{ ok: boolean }> {
+    const res = await fetch(`${this.#base}/api/license/deactivate`, { method: "POST" });
+    return (await res.json()) as { ok: boolean };
+  }
+  async getConnect(): Promise<ConnectSnippet> {
+    const res = await fetch(`${this.#base}/api/connect`);
+    if (!res.ok) throw new Error(`connect fetch failed: ${res.status}`);
+    return (await res.json()) as ConnectSnippet;
   }
 }

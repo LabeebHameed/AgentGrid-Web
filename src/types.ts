@@ -232,6 +232,50 @@ export interface ActivityResponse {
   readonly generatedAt: string;
 }
 
+// ─── Product config / licensing (mirror packages/server/src/config) ───────────
+
+export type LicenseMode = "disabled" | "enforced";
+
+export interface LicenseStatus {
+  readonly mode: LicenseMode;
+  readonly operable: boolean;
+  readonly plan: string | null;
+  readonly expiresAt: string | null;
+  readonly reason: string;
+}
+
+export interface MandateConfig {
+  readonly capability: Capability;
+  readonly scope: Record<string, unknown> & { capability: Capability };
+  readonly stepUpThresholdMinor: number | null;
+}
+
+export interface AppConfig {
+  readonly version: 1;
+  readonly operator: {
+    readonly displayName: string;
+    readonly preferences: { readonly telemetryOptIn: boolean };
+  };
+  readonly license: {
+    readonly mode: LicenseMode;
+    readonly proxyBaseUrl: string | null;
+    readonly publicKeyBase64Url: string | null;
+  };
+  readonly agent: {
+    readonly displayName: string;
+    readonly mandates: readonly MandateConfig[];
+  };
+}
+
+export interface LoadedConfig {
+  readonly config: AppConfig;
+  readonly firstRun: boolean;
+}
+
+export interface ConnectSnippet {
+  readonly snippet: { readonly mcpServers: Record<string, { command: string; args: string[] }> };
+}
+
 /** Triage tier, derived from the request — drives the visual weight of a card. */
 export type RiskTier = "elevated" | "high";
 

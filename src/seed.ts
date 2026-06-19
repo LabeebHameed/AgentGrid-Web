@@ -2,6 +2,7 @@ import type {
   ActivityEntry,
   ActivityResponse,
   AgentSummary,
+  AppConfig,
   ApprovalRequest,
   AuditView,
   FrozenState,
@@ -346,6 +347,36 @@ export const seedGovernanceOverview = (frozen: FrozenState): GovernanceOverview 
     { kind: "audit", label: "Audit Ledger", status: "ok", detail: "chain verified", view: "/audit" },
     { kind: "identity", label: "Passport", status: "ok", detail: "active", view: "/identity" },
   ],
+});
+
+export const seedConfig = (): AppConfig => ({
+  version: 1,
+  operator: { displayName: "Operator", preferences: { telemetryOptIn: false } },
+  license: { mode: "disabled", proxyBaseUrl: null, publicKeyBase64Url: null },
+  agent: {
+    displayName: "Aegis Agent",
+    mandates: [
+      {
+        capability: "browse",
+        scope: { capability: "browse", allowedDomains: ["*"], deniedDomains: [], maxSessionMinutes: 60 },
+        stepUpThresholdMinor: null,
+      },
+      {
+        capability: "pay",
+        scope: {
+          capability: "pay",
+          currency: "USD",
+          limitPerTransactionMinor: 2000,
+          limitPerPeriodMinor: 2000,
+          periodDays: 30,
+          allowedCategories: ["saas", "compute", "data"],
+          allowedMerchants: ["*"],
+          deniedMerchants: [],
+        },
+        stepUpThresholdMinor: 1000,
+      },
+    ],
+  },
 });
 
 export const seedActivityResponse = (frozen: boolean): ActivityResponse => {

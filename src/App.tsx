@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Inbox, History as HistoryIcon, Bot, ShieldQuestion, LayoutDashboard, Landmark } from "lucide-react";
+import { ShieldCheck, Inbox, History as HistoryIcon, Bot, ShieldQuestion, LayoutDashboard, Landmark, Settings as SettingsIcon } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
 import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, ResolvedApproval } from "./types";
 import { shortDid } from "./lib/format";
@@ -9,8 +9,9 @@ import { ApprovalCard } from "./components/ApprovalCard";
 import { History } from "./components/History";
 import { Dashboard } from "./components/Dashboard";
 import { GovernanceConsole } from "./components/Governance";
+import { Settings } from "./components/Settings";
 
-type View = "governance" | "dashboard" | "inbox" | "history";
+type View = "governance" | "dashboard" | "inbox" | "history" | "settings";
 
 // The app is part of Aegis: by default it talks to the bridge that serves it,
 // same-origin (`/api/...`). VITE_AEGIS_API points it at a bridge on another
@@ -170,6 +171,7 @@ export default function App() {
           <NavButton active={view === "dashboard"} onClick={() => setView("dashboard")} label="Dashboard" icon={<LayoutDashboard className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "inbox"} onClick={() => setView("inbox")} label="Inbox" count={pending.length} icon={<Inbox className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "history"} onClick={() => setView("history")} label="History" icon={<HistoryIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
+          <NavButton active={view === "settings"} onClick={() => setView("settings")} label="Settings" icon={<SettingsIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
         </nav>
 
         <div className="mt-auto flex items-center gap-3 rounded-[var(--radius-md)] border px-3 py-3" style={{ borderColor: "var(--line)" }}>
@@ -196,12 +198,15 @@ export default function App() {
             <button onClick={() => setView("dashboard")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "dashboard" ? "var(--surface-3)" : "transparent", color: view === "dashboard" ? "var(--text)" : "var(--muted)" }}>Dashboard</button>
             <button onClick={() => setView("inbox")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "inbox" ? "var(--surface-3)" : "transparent", color: view === "inbox" ? "var(--text)" : "var(--muted)" }}>Inbox</button>
             <button onClick={() => setView("history")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "history" ? "var(--surface-3)" : "transparent", color: view === "history" ? "var(--text)" : "var(--muted)" }}>History</button>
+            <button onClick={() => setView("settings")} className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium cursor-pointer" style={{ background: view === "settings" ? "var(--surface-3)" : "transparent", color: view === "settings" ? "var(--text)" : "var(--muted)" }}>Settings</button>
           </div>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-            {view === "governance" ? (
+            {view === "settings" ? (
+              <Settings api={api} />
+            ) : view === "governance" ? (
               <GovernanceConsole api={api} agents={agents} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
             ) : view === "dashboard" ? (
               <Dashboard agents={agents} activity={activity} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
