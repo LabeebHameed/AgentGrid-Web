@@ -49,8 +49,32 @@ const LicenseStep = ({ api }: { api: ApprovalApi }) => {
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { void api.getLicense().then(setStatus); }, [api]);
+  useEffect(() => {
+    setError(null);
+    api.getLicense()
+      .then(setStatus)
+      .catch((err) => {
+        console.error(err);
+        setError("Connection failed. Make sure your Railway backend is online.");
+      });
+  }, [api]);
+
+  if (error !== null) {
+    return (
+      <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
+        <p className="font-semibold">{error}</p>
+        <p className="mt-1 text-xs opacity-90">
+          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+        </p>
+      </div>
+    );
+  }
+
+  if (status === null) {
+    return <div className="text-sm text-[var(--muted)] animate-pulse">Connecting to backend...</div>;
+  }
 
   const activate = async () => {
     setBusy(true); setMsg(null);
@@ -113,8 +137,17 @@ const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void })
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { void api.getConfig().then((l) => setConfig(l.config)); }, [api]);
+  useEffect(() => {
+    setError(null);
+    api.getConfig()
+      .then((l) => setConfig(l.config))
+      .catch((err) => {
+        console.error(err);
+        setError("Connection failed. Make sure your Railway backend is online.");
+      });
+  }, [api]);
 
   const save = async () => {
     if (config === null) return;
@@ -125,7 +158,20 @@ const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void })
     } finally { setBusy(false); }
   };
 
-  if (config === null) return null;
+  if (error !== null) {
+    return (
+      <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
+        <p className="font-semibold">{error}</p>
+        <p className="mt-1 text-xs opacity-90">
+          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+        </p>
+      </div>
+    );
+  }
+
+  if (config === null) {
+    return <div className="text-sm text-[var(--muted)] animate-pulse">Loading configuration from backend...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-4">

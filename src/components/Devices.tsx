@@ -62,13 +62,16 @@ const DeviceRow = ({
 export const DevicesScreen = ({ api, compact = false }: { api: ApprovalApi; compact?: boolean }) => {
   const [view, setView] = useState<{ devices: readonly DeviceEntry[]; enrollQrPayload: string } | null>(null);
   const [unlinking, setUnlinking] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const v = await api.getDevices();
       setView(v);
-    } catch {
-      // silently swallow — backend may not support this yet
+    } catch (err) {
+      console.error(err);
+      setError("Connection failed. Make sure your Railway backend is online.");
     }
   }, [api]);
 
@@ -84,7 +87,20 @@ export const DevicesScreen = ({ api, compact = false }: { api: ApprovalApi; comp
     }
   };
 
-  if (view === null) return null;
+  if (error !== null) {
+    return (
+      <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
+        <p className="font-semibold">{error}</p>
+        <p className="mt-1 text-xs opacity-90">
+          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+        </p>
+      </div>
+    );
+  }
+
+  if (view === null) {
+    return <div className="text-sm text-[var(--muted)] animate-pulse">Loading devices from backend...</div>;
+  }
 
   return (
     <div>

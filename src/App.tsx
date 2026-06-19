@@ -115,6 +115,7 @@ export default function App() {
   const [view, setView] = useState<View>("governance");
   const [busy, setBusy] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
 
@@ -122,21 +123,32 @@ export default function App() {
   const [wizardVisible, dismissWizard] = useWizardVisible();
 
   const refresh = useCallback(async () => {
-    const [p, h, ag, ac] = await Promise.all([
-      api.listPending(),
-      api.listHistory(),
-      api.listAgents(),
-      api.listActivity(),
-    ]);
-    setPending(p);
-    setHistory(h);
-    setAgents(ag);
-    setActivity(ac);
+    try {
+      const [p, h, ag, ac] = await Promise.all([
+        api.listPending(),
+        api.listHistory(),
+        api.listAgents(),
+        api.listActivity(),
+      ]);
+      setPending(p);
+      setHistory(h);
+      setAgents(ag);
+      setActivity(ac);
+      setConnectionError(null);
+    } catch (err) {
+      console.error(err);
+      setConnectionError("Connection failed. Make sure your Railway backend is online.");
+    }
   }, []);
 
   // Periodically check license status for the unlicensed-state banner (task 4.8)
   const refreshLicense = useCallback(async () => {
-    try { setLicenseStatus(await api.getLicense()); } catch { /* ignore */ }
+    try {
+      setLicenseStatus(await api.getLicense());
+      setConnectionError(null);
+    } catch {
+      // Handled by main refresh
+    }
   }, []);
 
   const freeze = useCallback(
@@ -268,6 +280,19 @@ export default function App() {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
+            {/* Connection error warning banner */}
+            {connectionError !== null && (
+              <div className="mb-6 rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
+                <p className="font-semibold">{connectionError}</p>
+                <p className="mt-1 text-xs opacity-90">
+                  The dashboard is trying to connect to the backend at: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+                </p>
+                <p className="mt-2 text-xs opacity-80">
+                  Ensure the Railway backend is running, and that you have configured <code>VITE_AEGIS_API</code> in Vercel to point to your Railway URL.
+                </p>
+              </div>
+            )}
+
             {/* Unlicensed-state UX banner (task 4.8) */}
             {showUnlicensedBanner && (
               <UnlicensedBanner onGoToLicense={() => setView("settings")} />
