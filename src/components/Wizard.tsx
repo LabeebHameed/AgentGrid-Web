@@ -9,7 +9,7 @@
  *   Step 5 → Connect your AI (copy MCP snippet)
  *
  * The wizard is shown when `?wizard=1` is in the URL (set by the CLI launcher
- * on first run) or when `localStorage.aegis_wizard_done` is not set.
+ * on first run) or when `localStorage.agentgrid_wizard_done` is not set.
  * Completing or skipping sets the flag and calls `onDone()`.
  */
 
@@ -20,7 +20,7 @@ import type { AppConfig, ConnectSnippet, LicenseStatus } from "../types";
 import { ProvidersScreen } from "./Providers";
 import { DevicesScreen } from "./Devices";
 
-const WIZARD_DONE_KEY = "aegis_wizard_done";
+const WIZARD_DONE_KEY = "agentgrid_wizard_done";
 
 const STEPS = [
   { id: "license", label: "License", icon: <KeyRound className="h-4 w-4" strokeWidth={1.75} aria-hidden />, optional: true },
@@ -66,7 +66,7 @@ const LicenseStep = ({ api }: { api: ApprovalApi }) => {
       <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
         <p className="font-semibold">{error}</p>
         <p className="mt-1 text-xs opacity-90">
-          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AGENTGRID_API || "same-origin (Vercel host)"}</code>
         </p>
       </div>
     );
@@ -163,7 +163,7 @@ const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void })
       <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
         <p className="font-semibold">{error}</p>
         <p className="mt-1 text-xs opacity-90">
-          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AGENTGRID_API || "same-origin (Vercel host)"}</code>
         </p>
       </div>
     );
@@ -269,7 +269,7 @@ const ConnectStep = ({ api }: { api: ApprovalApi }) => {
     <div className="flex flex-col gap-4">
       <p className="text-sm text-[var(--muted)]">
         Paste this JSON block into your AI client's MCP settings (Claude Desktop, Cursor, etc.) and restart it.
-        Aegis will then show up as a tool set your AI can use.
+        Agent Grid will then show up as a tool set your AI can use.
       </p>
       <pre
         className="mono overflow-x-auto rounded-[var(--radius-md)] p-3 text-xs text-[var(--text)]"
@@ -288,7 +288,7 @@ const ConnectStep = ({ api }: { api: ApprovalApi }) => {
       <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--ok-dim)", color: "var(--ok)" }}>
         <p className="font-semibold">You're all set! 🎉</p>
         <p className="mt-0.5 text-xs opacity-80">
-          Keep Aegis running in the background. Your AI now has governed access to the capabilities you enabled.
+          Keep Agent Grid running in the background. Your AI now has governed access to the capabilities you enabled.
         </p>
       </div>
     </div>
@@ -337,7 +337,7 @@ export const SetupWizard = ({ api, onDone }: { api: ApprovalApi; onDone: () => v
       style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
       role="dialog"
       aria-modal="true"
-      aria-label="Aegis setup wizard"
+      aria-label="Agent Grid setup wizard"
     >
       <div
         className="relative flex w-full max-w-lg flex-col rounded-[var(--radius-xl)] border shadow-xl"

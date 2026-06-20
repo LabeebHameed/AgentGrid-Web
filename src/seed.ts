@@ -60,7 +60,7 @@ export const seedPending = (): ApprovalRequest[] => [
     amountMinor: null,
     currency: null,
     merchant: null,
-    targetService: "aegis-cloud",
+    targetService: "agentgrid-cloud",
     targetDomain: "status-bot.vercel.app",
     rationale: "Publish the status page the user requested to *.vercel.app (≈$0/mo).",
     nonce: "n_55b9c12d4a",
@@ -115,7 +115,7 @@ export const seedHistory = (): ResolvedApproval[] => [
 export const seedAgents = (): AgentSummary[] => [
   {
     did: AGENT,
-    displayName: "Aegis Agent",
+    displayName: "Agent Grid Agent",
     capabilities: ["browse", "comms", "pay", "deploy"],
     status: { frozen: false, reason: null, since: null },
   },
@@ -329,7 +329,7 @@ export const seedAudit = (): AuditView => {
 export const seedIdentity = (): IdentityView => ({
   passportId: AGENT,
   operatorDid: OPERATOR,
-  displayName: "Aegis Agent",
+  displayName: "Agent Grid Agent",
   status: "active",
 });
 
@@ -354,7 +354,7 @@ export const seedConfig = (): AppConfig => ({
   operator: { displayName: "Operator", preferences: { telemetryOptIn: false } },
   license: { mode: "disabled", proxyBaseUrl: null, publicKeyBase64Url: null },
   agent: {
-    displayName: "Aegis Agent",
+    displayName: "Agent Grid Agent",
     mandates: [
       {
         capability: "browse",

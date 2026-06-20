@@ -35,7 +35,7 @@ const resolveApiBase = (): string => {
   const qPort = params.get("port");
 
   if (qApi) {
-    localStorage.setItem("aegis_api_base", qApi);
+    localStorage.setItem("agentgrid_api_base", qApi);
     const url = new URL(window.location.href);
     url.searchParams.delete("api");
     window.history.replaceState({}, "", url.toString());
@@ -44,18 +44,18 @@ const resolveApiBase = (): string => {
 
   if (qPort) {
     const localBase = `http://localhost:${qPort}`;
-    localStorage.setItem("aegis_api_base", localBase);
+    localStorage.setItem("agentgrid_api_base", localBase);
     const url = new URL(window.location.href);
     url.searchParams.delete("port");
     window.history.replaceState({}, "", url.toString());
     return localBase;
   }
 
-  return localStorage.getItem("aegis_api_base") || (import.meta.env.VITE_AEGIS_API as string) || "";
+  return localStorage.getItem("agentgrid_api_base") || (import.meta.env.VITE_AGENTGRID_API as string) || "";
 };
 
 const apiBase = resolveApiBase();
-const demo = (import.meta.env.VITE_AEGIS_DEMO as string | undefined) === "1";
+const demo = (import.meta.env.VITE_AGENTGRID_DEMO as string | undefined) === "1";
 const api: ApprovalApi = demo
   ? new SeedApi()
   : new HttpApi(apiBase);
@@ -246,7 +246,7 @@ export default function App() {
       >
         <div className="flex items-center gap-2.5 px-2">
           <ShieldCheck className="h-6 w-6 text-[var(--text)]" strokeWidth={1.75} aria-hidden />
-          <span className="text-base font-semibold tracking-tight text-[var(--text)]">Aegis</span>
+          <span className="text-base font-semibold tracking-tight text-[var(--text)]">Agent Grid</span>
         </div>
         <p className="mb-7 mt-1 px-2 text-xs text-[var(--subtle)]">Approvals</p>
 
@@ -270,7 +270,7 @@ export default function App() {
             <Bot className="h-4 w-4 text-[var(--muted)]" strokeWidth={1.75} aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-[var(--text)]">Aegis Agent</p>
+            <p className="truncate text-xs font-medium text-[var(--text)]">Agent Grid Agent</p>
             <p className="mono truncate text-[11px] text-[var(--subtle)]">{shortDid(AGENT)}</p>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function App() {
         <header className="flex items-center justify-between border-b px-5 py-4 lg:hidden" style={{ borderColor: "var(--line)" }}>
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-[var(--text)]" strokeWidth={1.75} aria-hidden />
-            <span className="font-semibold tracking-tight text-[var(--text)]">Aegis</span>
+            <span className="font-semibold tracking-tight text-[var(--text)]">Agent Grid</span>
           </div>
           <div className="flex gap-1 rounded-[var(--radius-md)] p-1" style={{ background: "var(--surface-2)" }}>
             {(["governance", "dashboard", "inbox", "history", "providers", "devices", "settings"] as View[]).map((v) => (
@@ -308,10 +308,10 @@ export default function App() {
               <div className="mb-6 rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
                 <p className="font-semibold">{connectionError}</p>
                 <p className="mt-1 text-xs opacity-90">
-                  The dashboard is trying to connect to the backend at: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+                  The dashboard is trying to connect to the backend at: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AGENTGRID_API || "same-origin (Vercel host)"}</code>
                 </p>
                 <p className="mt-2 text-xs opacity-80">
-                  Ensure the Railway backend is running, and that you have configured <code>VITE_AEGIS_API</code> in Vercel to point to your Railway URL.
+                  Ensure the Railway backend is running, and that you have configured <code>VITE_AGENTGRID_API</code> in Vercel to point to your Railway URL.
                 </p>
               </div>
             )}

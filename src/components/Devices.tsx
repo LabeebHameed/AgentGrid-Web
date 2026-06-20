@@ -15,7 +15,7 @@ const QrPlaceholder = ({ payload }: { payload: string }) => (
     <div className="text-center">
       <p className="text-sm font-semibold text-[var(--text)]">Link your phone</p>
       <p className="mt-1 max-w-xs text-xs text-[var(--muted)]">
-        Open the Aegis mobile app and scan this code, or paste the enrollment URL manually.
+        Open the Agent Grid mobile app and scan this code, or paste the enrollment URL manually.
       </p>
     </div>
     <code
@@ -92,7 +92,7 @@ export const DevicesScreen = ({ api, compact = false }: { api: ApprovalApi; comp
       <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
         <p className="font-semibold">{error}</p>
         <p className="mt-1 text-xs opacity-90">
-          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AGENTGRID_API || "same-origin (Vercel host)"}</code>
         </p>
       </div>
     );
@@ -108,7 +108,7 @@ export const DevicesScreen = ({ api, compact = false }: { api: ApprovalApi; comp
         <>
           <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text)]">Devices</h1>
           <p className="mb-6 text-sm text-[var(--muted)]">
-            Linked phones that can approve agent actions. Scan the QR code in the Aegis mobile app.
+            Linked phones that can approve agent actions. Scan the QR code in the Agent Grid mobile app.
           </p>
         </>
       )}

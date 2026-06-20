@@ -50,7 +50,7 @@ export type SetCardLimitsResult =
   | { readonly ok: false; readonly reason: string };
 
 /**
- * The boundary to the Aegis approval transport. The MVP runs against an in-browser
+ * The boundary to the Agent Grid approval transport. The MVP runs against an in-browser
  * seeded store so the surface is fully demoable with no backend; `HttpApi` is the
  * same contract over the real PendingApprovalStore (GET /api/approvals, POST a
  * signed decision) for when the operator-signing backend is wired up.
@@ -241,7 +241,7 @@ export class SeedApi implements ApprovalApi {
     return { ok: true };
   }
   async getConnect(): Promise<ConnectSnippet> {
-    return { snippet: { mcpServers: { aegis: { command: "npx", args: ["tsx", "packages/server/src/main.ts"] } } } };
+    return { snippet: { mcpServers: { agentgrid: { command: "npx", args: ["tsx", "packages/server/src/main.ts"] } } } };
   }
   async getProviders(): Promise<ProvidersView> {
     return {
@@ -255,7 +255,7 @@ export class SeedApi implements ApprovalApi {
     };
   }
   async getDevices(): Promise<DevicesView> {
-    return { devices: [], enrollQrPayload: "https://aegis.local/enroll" };
+    return { devices: [], enrollQrPayload: "https://agentgrid.local/enroll" };
   }
   async unlinkDevice(_params: { token: string }): Promise<{ ok: boolean }> {
     return { ok: true };

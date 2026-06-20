@@ -66,7 +66,7 @@ const LicenseSection = ({ api }: { api: ApprovalApi }) => {
       <SectionTitle
         icon={<KeyRound className="h-5 w-5" strokeWidth={1.75} aria-hidden />}
         title="License"
-        subtitle={disabled ? "Enforcement is OFF — the agent runs without a license while you test." : "Your Aegis license."}
+        subtitle={disabled ? "Enforcement is OFF — the agent runs without a license while you test." : "Your Agent Grid license."}
       />
       {disabled ? (
         <p className="rounded-[var(--radius-md)] px-3 py-2 text-sm" style={{ background: "var(--warn-dim)", color: "var(--warn)" }}>
@@ -189,7 +189,7 @@ const AgentConfigSection = ({ api }: { api: ApprovalApi }) => {
         <button disabled={busy} onClick={() => void save()} className="rounded-[var(--radius-md)] px-3.5 py-2 text-sm font-semibold cursor-pointer disabled:opacity-50" style={{ background: "var(--text)", color: "var(--bg)" }}>Save configuration</button>
         {result?.ok === true && (
           <span className="inline-flex items-center gap-1.5 text-sm" style={{ color: "var(--ok)" }}>
-            <Check className="h-4 w-4" aria-hidden /> Saved{result.restartRequired ? " — restart Aegis to apply" : ""}
+            <Check className="h-4 w-4" aria-hidden /> Saved{result.restartRequired ? " — restart Agent Grid to apply" : ""}
           </span>
         )}
         {result?.ok === false && (

@@ -68,7 +68,7 @@ const ProviderCard = ({ provider, compact = false }: { provider: ProviderStatus;
           >
             .env
           </code>{" "}
-          file, then restart Aegis.
+          file, then restart Agent Grid.
         </p>
       )}
     </div>
@@ -104,7 +104,7 @@ export const ProvidersScreen = ({ api, compact = false }: { api: ApprovalApi; co
       <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
         <p className="font-semibold">{error}</p>
         <p className="mt-1 text-xs opacity-90">
-          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AEGIS_API || "same-origin (Vercel host)"}</code>
+          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AGENTGRID_API || "same-origin (Vercel host)"}</code>
         </p>
       </div>
     );
@@ -135,7 +135,7 @@ export const ProvidersScreen = ({ api, compact = false }: { api: ApprovalApi; co
           <p className="mb-6 text-sm text-[var(--muted)]">
             {connected} of {providers.length} providers connected. Add API keys to your{" "}
             <code className="mono rounded px-1 py-0.5 text-xs" style={{ background: "var(--surface-2)" }}>.env</code>{" "}
-            file and restart Aegis to activate them.
+            file and restart Agent Grid to activate them.
           </p>
         </>
       )}

@@ -1,6 +1,6 @@
 /**
- * The wire model, mirrored from @aegis/approval (protocol.ts) so this app speaks
- * the real Aegis approval shape — ready to point at the live PendingApprovalStore.
+ * The wire model, mirrored from @agent-grid/approval (protocol.ts) so this app speaks
+ * the real Agent Grid approval shape — ready to point at the live PendingApprovalStore.
  */
 
 export type Capability = "browse" | "comms" | "pay" | "deploy" | "vault" | "signup";

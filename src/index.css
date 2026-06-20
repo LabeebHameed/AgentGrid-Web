@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Aegis Approvals — design tokens.
+ * Agent Grid Approvals — design tokens.
  * Security-grade, near-black, semantic color ONLY (no decorative gradients/glows).
  * Risk reads through color; amounts/DIDs/nonces read through the monospace face.
  * Contrast targets WCAG 2.1 AA (>= 4.5:1 body, >= 3:1 large/UI) on the dark base.

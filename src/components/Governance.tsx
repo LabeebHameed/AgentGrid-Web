@@ -686,7 +686,7 @@ export const GovernanceConsole = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "aegis-audit-export.json";
+    a.download = "agentgrid-audit-export.json";
     a.click();
     URL.revokeObjectURL(url);
   }, [api]);
