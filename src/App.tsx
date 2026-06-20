@@ -25,6 +25,7 @@ import { Settings } from "./components/Settings";
 import { ProvidersScreen } from "./components/Providers";
 import { DevicesScreen } from "./components/Devices";
 import { SetupWizard, useWizardVisible } from "./components/Wizard";
+import { BridgeSetup } from "./components/BridgeSetup";
 
 type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices";
 
@@ -139,6 +140,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [showBridgeSetup, setShowBridgeSetup] = useState(!demo && apiBase === "");
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
 
@@ -160,7 +162,10 @@ export default function App() {
       setConnectionError(null);
     } catch (err) {
       console.error(err);
-      setConnectionError("Connection failed. Make sure your Railway backend is online.");
+      if (!demo && !showBridgeSetup) {
+        setShowBridgeSetup(true);
+      }
+      setConnectionError("Backend connection failed. Use the setup wizard to get started.");
     }
   }, []);
 
@@ -231,8 +236,16 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Bridge setup — shown when backend is unreachable and not demo mode */}
+      {showBridgeSetup && (
+        <BridgeSetup
+          apiBase={apiBase || "http://localhost:8787"}
+          onConnected={() => { setShowBridgeSetup(false); void refresh(); }}
+        />
+      )}
+
       {/* First-run wizard overlay */}
-      {wizardVisible && (
+      {!showBridgeSetup && wizardVisible && (
         <SetupWizard
           api={api}
           onDone={() => { dismissWizard(); }}
@@ -241,7 +254,7 @@ export default function App() {
 
       {/* Desktop rail */}
       <aside
-        className="hidden w-60 shrink-0 flex-col border-r px-4 py-6 lg:flex"
+        className={`hidden w-60 shrink-0 flex-col border-r px-4 py-6 lg:flex ${showBridgeSetup ? "opacity-50 pointer-events-none" : ""}`}
         style={{ borderColor: "var(--line)", background: "var(--surface)" }}
       >
         <div className="flex items-center gap-2.5 px-2">
@@ -277,7 +290,7 @@ export default function App() {
       </aside>
 
       {/* Main */}
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className={`flex min-w-0 flex-1 flex-col ${showBridgeSetup ? "opacity-50 pointer-events-none" : ""}`}>
         {/* Mobile top bar */}
         <header className="flex items-center justify-between border-b px-5 py-4 lg:hidden" style={{ borderColor: "var(--line)" }}>
           <div className="flex items-center gap-2">

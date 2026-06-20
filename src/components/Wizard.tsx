@@ -268,27 +268,36 @@ const ConnectStep = ({ api }: { api: ApprovalApi }) => {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-[var(--muted)]">
-        Paste this JSON block into your AI client's MCP settings (Claude Desktop, Cursor, etc.) and restart it.
-        Agent Grid will then show up as a tool set your AI can use.
+        Agent Grid gives your AI governed access to tools. Configure it in your AI client:
       </p>
-      <pre
-        className="mono overflow-x-auto rounded-[var(--radius-md)] p-3 text-xs text-[var(--text)]"
-        style={{ background: "var(--surface-2)" }}
-      >
-        {text}
-      </pre>
-      <button
-        onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-        className="self-start inline-flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium cursor-pointer"
-        style={{ background: "var(--surface-2)", color: "var(--muted)" }}
-      >
-        {copied ? <Check className="h-4 w-4" aria-hidden /> : <Link2 className="h-4 w-4" aria-hidden />}
-        {copied ? "Copied!" : "Copy snippet"}
-      </button>
+
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--subtle)] mb-2">MCP Configuration</p>
+        <p className="text-xs text-[var(--muted)] mb-3">
+          Copy this JSON block into your AI client's MCP settings (Claude Desktop, Cursor, etc.) and restart it.
+        </p>
+        <div className="flex items-stretch gap-2">
+          <pre
+            className="flex-1 mono overflow-x-auto rounded-[var(--radius-md)] p-3 text-xs text-[var(--text)]"
+            style={{ background: "var(--surface-2)" }}
+          >
+            {text}
+          </pre>
+          <button
+            onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+            className="px-3 py-2 rounded-[var(--radius-md)] cursor-pointer flex items-center gap-1.5"
+            style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+          >
+            {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+            <span className="text-xs font-medium">{copied ? "Copied" : "Copy"}</span>
+          </button>
+        </div>
+      </div>
+
       <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--ok-dim)", color: "var(--ok)" }}>
-        <p className="font-semibold">You're all set! 🎉</p>
-        <p className="mt-0.5 text-xs opacity-80">
-          Keep Agent Grid running in the background. Your AI now has governed access to the capabilities you enabled.
+        <p className="font-semibold text-xs">✓ All set! 🎉</p>
+        <p className="mt-1 text-xs opacity-80">
+          Your AI now has governed access to the capabilities you enabled. Agent Grid will show approvals in this console whenever your AI needs to step up.
         </p>
       </div>
     </div>
