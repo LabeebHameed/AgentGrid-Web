@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
 import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval } from "./types";
+import { SignedIn, SignedOut, SignIn, useAuth } from "@clerk/clerk-react";
 import { shortDid } from "./lib/format";
 import { useMediaQuery, useNow } from "./lib/useMediaQuery";
 import { InboxList } from "./components/InboxList";
@@ -130,7 +131,17 @@ const NavButton = ({
   </button>
 );
 
-export default function App() {
+interface AppProps {
+  readonly getClerkToken?: () => Promise<string | null>;
+}
+
+export default function App({ getClerkToken }: AppProps = {}) {
+  useEffect(() => {
+    if (getClerkToken && api instanceof HttpApi) {
+      api.setGetClerkToken(getClerkToken);
+    }
+  }, [getClerkToken]);
+
   const [pending, setPending] = useState<readonly ApprovalRequest[]>([]);
   const [history, setHistory] = useState<readonly ResolvedApproval[]>([]);
   const [agents, setAgents] = useState<readonly AgentSummary[]>([]);
@@ -391,4 +402,65 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+export function ClerkAppWrapper() {
+  return (
+    <>
+      <SignedIn>
+        <ClerkAppContent />
+      </SignedIn>
+      <SignedOut>
+        <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0c] font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+          {/* Ambient light blobs */}
+          <div className="absolute top-[-10%] left-[-10%] h-[45%] w-[45%] rounded-full bg-indigo-500/10 blur-[130px] pointer-events-none animate-pulse" style={{ animationDuration: '8s' }} />
+          <div className="absolute bottom-[-10%] right-[-10%] h-[45%] w-[45%] rounded-full bg-violet-600/10 blur-[130px] pointer-events-none animate-pulse" style={{ animationDuration: '10s' }} />
+          
+          <div className="relative z-10 w-full max-w-md p-6">
+            <div className="flex flex-col items-center text-center">
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-500 shadow-[0_0_40px_rgba(99,102,241,0.25)]">
+                <ShieldCheck className="h-9 w-9 text-white" strokeWidth={1.5} />
+              </div>
+              <h2 className="mt-8 text-3xl font-extrabold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
+                Agent Grid Console
+              </h2>
+              <p className="mt-3 text-sm text-[#8c8c9e] max-w-sm">
+                A secure multi-tenant operator interface for human-in-the-loop autonomous AI agents.
+              </p>
+            </div>
+            
+            <div className="mt-10 overflow-hidden rounded-3xl border border-white/[0.06] bg-black/45 backdrop-blur-2xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+              <SignIn 
+                routing="hash"
+                appearance={{
+                  elements: {
+                    rootBox: "w-full",
+                    card: "bg-transparent shadow-none p-0 border-none w-full",
+                    headerTitle: "text-white font-bold",
+                    headerSubtitle: "text-[#8c8c9e]",
+                    socialButtonsBlockButton: "bg-[#16161a] border border-white/[0.08] hover:bg-[#1e1e24] text-white transition-all duration-200",
+                    socialButtonsBlockButtonText: "text-white font-medium",
+                    formButtonPrimary: "bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-semibold transition-all duration-200 shadow-[0_4px_20px_rgba(99,102,241,0.15)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.25)] border-none",
+                    formFieldLabel: "text-xs font-semibold text-[#8c8c9e] uppercase tracking-wider",
+                    formFieldInput: "bg-[#16161a] border border-white/[0.08] text-white focus:border-indigo-500 focus:ring-indigo-500 transition-all duration-200",
+                    footerActionText: "text-[#8c8c9e]",
+                    footerActionLink: "text-indigo-400 hover:text-indigo-300 font-semibold transition-all duration-200",
+                    dividerLine: "bg-white/[0.08]",
+                    dividerText: "text-[#8c8c9e] text-xs font-medium",
+                    identityPreviewText: "text-white",
+                    identityPreviewEditButtonIcon: "text-[#8c8c9e] hover:text-white"
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </SignedOut>
+    </>
+  );
+}
+
+function ClerkAppContent() {
+  const { getToken } = useAuth();
+  return <App getClerkToken={getToken} />;
 }

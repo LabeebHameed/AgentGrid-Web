@@ -264,56 +264,79 @@ export class SeedApi implements ApprovalApi {
 
 export class HttpApi implements ApprovalApi {
   readonly #base: string;
+  #getClerkToken?: () => Promise<string | null>;
+
   constructor(base: string) {
     this.#base = base;
   }
+
+  setGetClerkToken(getClerkToken: () => Promise<string | null>): void {
+    this.#getClerkToken = getClerkToken;
+  }
+
+  async #getHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
+    const headers: Record<string, string> = { ...extra };
+    if (this.#getClerkToken) {
+      const token = await this.#getClerkToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+    return headers;
+  }
+
   async listPending(): Promise<readonly ApprovalRequest[]> {
-    const res = await fetch(`${this.#base}/api/approvals`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/approvals`, { headers });
     if (!res.ok) throw new Error(`approvals fetch failed: ${res.status}`);
     return (await res.json()) as ApprovalRequest[];
   }
   async listHistory(): Promise<readonly ResolvedApproval[]> {
-    const res = await fetch(`${this.#base}/api/approvals/history`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/approvals/history`, { headers });
     if (!res.ok) throw new Error(`history fetch failed: ${res.status}`);
     return (await res.json()) as ResolvedApproval[];
   }
   async decide(params: { id: string; decision: ApprovalDecision; reason: string }): Promise<void> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`${this.#base}/api/approvals/${encodeURIComponent(params.id)}/decision`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ decision: params.decision, reason: params.reason }),
     });
     if (!res.ok) throw new Error(`decision failed: ${res.status}`);
   }
   async listActivity(): Promise<readonly ActivityEntry[]> {
-    const res = await fetch(`${this.#base}/api/activity`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/activity`, { headers });
     if (!res.ok) throw new Error(`activity fetch failed: ${res.status}`);
     return (await res.json()) as ActivityEntry[];
   }
   async listAgents(): Promise<readonly AgentSummary[]> {
-    const res = await fetch(`${this.#base}/api/agents`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/agents`, { headers });
     if (!res.ok) throw new Error(`agents fetch failed: ${res.status}`);
     return (await res.json()) as AgentSummary[];
   }
   async freeze(params: { agentDid: string; reason: string }): Promise<void> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`${this.#base}/api/agents/${encodeURIComponent(params.agentDid)}/freeze`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ reason: params.reason }),
     });
     if (!res.ok) throw new Error(`freeze failed: ${res.status}`);
   }
   async unfreeze(params: { agentDid: string }): Promise<void> {
+    const headers = await this.#getHeaders();
     const res = await fetch(`${this.#base}/api/agents/${encodeURIComponent(params.agentDid)}/unfreeze`, {
       method: "POST",
+      headers,
     });
     if (!res.ok) throw new Error(`unfreeze failed: ${res.status}`);
   }
 
   // ─── Governance ───────────────────────────────────────────────────────────
-  // The console is served same-origin and has no operator key of its own, so it
-  // obtains a bearer token via the server-signed local session (the bridge holds
-  // the operator key in the vault, exactly as it does to sign approvals).
   #token: string | null = null;
   #agentDid: string | null = null;
 
@@ -335,9 +358,16 @@ export class HttpApi implements ApprovalApi {
     return token;
   }
 
-  /** GET a governance route, minting/refreshing the session token as needed. */
   async #govGet<T>(suffix: string): Promise<T> {
     const did = await this.#ensureAgentDid();
+    if (this.#getClerkToken) {
+      const headers = await this.#getHeaders();
+      const res = await fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
+        headers,
+      });
+      if (!res.ok) throw new Error(`governance ${suffix} failed: ${res.status}`);
+      return (await res.json()) as T;
+    }
     const run = async (token: string): Promise<Response> =>
       fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -353,6 +383,15 @@ export class HttpApi implements ApprovalApi {
 
   async #govPost<T>(suffix: string, body: unknown): Promise<{ status: number; data: T }> {
     const did = await this.#ensureAgentDid();
+    if (this.#getClerkToken) {
+      const headers = await this.#getHeaders({ "Content-Type": "application/json" });
+      const res = await fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, data: (await res.json().catch(() => ({}))) as T };
+    }
     const run = async (token: string): Promise<Response> =>
       fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
         method: "POST",
@@ -415,54 +454,63 @@ export class HttpApi implements ApprovalApi {
     return { ok: false, reason: data.reason ?? `request failed (${status})` };
   }
 
-  // ─── Product config / licensing (unauthenticated, same-origin local routes) ──
+  // ─── Product config / licensing ──
   async getConfig(): Promise<LoadedConfig> {
-    const res = await fetch(`${this.#base}/api/config`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/config`, { headers });
     if (!res.ok) throw new Error(`config fetch failed: ${res.status}`);
     return (await res.json()) as LoadedConfig;
   }
   async saveConfig(config: AppConfig): Promise<{ ok: boolean; errors?: readonly string[]; restartRequired?: boolean }> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`${this.#base}/api/config`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(config),
     });
     return (await res.json()) as { ok: boolean; errors?: readonly string[]; restartRequired?: boolean };
   }
   async getLicense(): Promise<LicenseStatus> {
-    const res = await fetch(`${this.#base}/api/license`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/license`, { headers });
     if (!res.ok) throw new Error(`license fetch failed: ${res.status}`);
     return (await res.json()) as LicenseStatus;
   }
   async activateLicense(params: { key: string }): Promise<{ ok: boolean; reason?: string }> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`${this.#base}/api/license/activate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(params),
     });
     return (await res.json()) as { ok: boolean; reason?: string };
   }
   async deactivateLicense(): Promise<{ ok: boolean }> {
-    const res = await fetch(`${this.#base}/api/license/deactivate`, { method: "POST" });
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/license/deactivate`, { method: "POST", headers });
     return (await res.json()) as { ok: boolean };
   }
   async getConnect(): Promise<ConnectSnippet> {
-    const res = await fetch(`${this.#base}/api/connect`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/connect`, { headers });
     if (!res.ok) throw new Error(`connect fetch failed: ${res.status}`);
     return (await res.json()) as ConnectSnippet;
   }
   async getProviders(): Promise<ProvidersView> {
-    const res = await fetch(`${this.#base}/api/providers`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/providers`, { headers });
     if (!res.ok) throw new Error(`providers fetch failed: ${res.status}`);
     return (await res.json()) as ProvidersView;
   }
   async getDevices(): Promise<DevicesView> {
-    const res = await fetch(`${this.#base}/api/devices`);
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/devices`, { headers });
     if (!res.ok) throw new Error(`devices fetch failed: ${res.status}`);
     return (await res.json()) as DevicesView;
   }
   async unlinkDevice(params: { token: string }): Promise<{ ok: boolean }> {
-    const res = await fetch(`${this.#base}/api/devices/${encodeURIComponent(params.token)}/unlink`, { method: "POST" });
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/devices/${encodeURIComponent(params.token)}/unlink`, { method: "POST", headers });
     if (!res.ok) throw new Error(`unlink failed: ${res.status}`);
     return (await res.json()) as { ok: boolean };
   }
