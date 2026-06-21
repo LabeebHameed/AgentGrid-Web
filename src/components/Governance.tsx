@@ -620,6 +620,7 @@ export const GovernanceConsole = ({
   const [activity, setActivity] = useState<ActivityResponse | null>(null);
   const [policyFilter, setPolicyFilter] = useState<PolicyFilter>({});
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const lastActivityOk = useRef<number>(Date.now());
   const [nowMs, setNowMs] = useState<number>(Date.now());
 
@@ -647,8 +648,10 @@ export const GovernanceConsole = ({
       setActivity(act);
       lastActivityOk.current = Date.now();
       setError(null);
+      setLoading(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "governance unavailable");
+      setLoading(false);
     }
   }, [api, policyFilter]);
 
@@ -690,6 +693,20 @@ export const GovernanceConsole = ({
     a.click();
     URL.revokeObjectURL(url);
   }, [api]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-3 animate-pulse">
+        <div className="h-8 w-2/3 rounded-[var(--radius-md)]" style={{ background: "var(--surface-2)" }} />
+        <div className="h-4 w-1/2 rounded-[var(--radius-md)]" style={{ background: "var(--surface-2)" }} />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-24 rounded-[var(--radius-lg)]" style={{ background: "var(--surface-2)" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // Unavailable error state: render NO governance values (R1.6, R9.7).
   if (error !== null && overview === null) {

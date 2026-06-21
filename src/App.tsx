@@ -159,8 +159,12 @@ export default function App({ getClerkToken }: AppProps = {}) {
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
 
-  // Onboarding dismissed flag — user explicitly closed before agent connected
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  // Track whether the first data fetch has completed so we don't flash onboarding before agents load
+  const [dataLoaded, setDataLoaded] = useState(false);
+  // Persist dismissed state in localStorage so it survives reloads
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => localStorage.getItem("agentgrid_onboarding_done") === "1",
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -175,9 +179,11 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setAgents(ag);
       setActivity(ac);
       setConnectionError(null);
+      setDataLoaded(true);
     } catch (err) {
       console.error(err);
       setConnectionError("Backend connection failed — retrying. Check that the relay is reachable.");
+      setDataLoaded(true);
     }
   }, []);
 
@@ -273,8 +279,13 @@ export default function App({ getClerkToken }: AppProps = {}) {
     licenseStatus.mode === "enforced" &&
     !licenseStatus.operable;
 
-  // Show onboarding when signed in but no agents connected yet (and not manually dismissed)
-  const showOnboarding = clerkMode && !demo && agents.length === 0 && !onboardingDismissed;
+  // Only show onboarding after the first fetch completes — prevents flashing on reload
+  const showOnboarding = dataLoaded && clerkMode && !demo && agents.length === 0 && !onboardingDismissed;
+
+  const dismissOnboarding = useCallback(() => {
+    localStorage.setItem("agentgrid_onboarding_done", "1");
+    setOnboardingDismissed(true);
+  }, []);
 
   if (showOnboarding) {
     return (
@@ -282,7 +293,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
         <OnboardingFlow
           api={api}
           agents={agents}
-          onDone={() => setOnboardingDismissed(true)}
+          onDone={dismissOnboarding}
         />
       </div>
     );
