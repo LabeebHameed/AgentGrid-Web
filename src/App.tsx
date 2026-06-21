@@ -156,7 +156,11 @@ export default function App({ getClerkToken }: AppProps = {}) {
   const [busy, setBusy] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [showBridgeSetup, setShowBridgeSetup] = useState(!demo && apiBase === "");
+  // The BridgeSetup flow is for LOCAL same-origin dev (no API base). In hosted
+  // Clerk mode the agent connects out via a token — there is no local bridge to
+  // set up — so a transient backend hiccup must never swap the whole console for
+  // the bridge screen; the inline connection banner covers that instead.
+  const [showBridgeSetup, setShowBridgeSetup] = useState(!demo && !clerkMode && apiBase === "");
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
 
@@ -178,10 +182,10 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setConnectionError(null);
     } catch (err) {
       console.error(err);
-      if (!demo && !showBridgeSetup) {
+      if (!demo && !clerkMode && !showBridgeSetup) {
         setShowBridgeSetup(true);
       }
-      setConnectionError("Backend connection failed. Use the setup wizard to get started.");
+      setConnectionError("Backend connection failed — retrying. Check that the relay is reachable.");
     }
   }, []);
 

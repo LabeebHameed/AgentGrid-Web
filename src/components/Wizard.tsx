@@ -16,7 +16,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Check, ChevronRight, X, KeyRound, Settings2, Plug, Smartphone, Link2 } from "lucide-react";
 import type { ApprovalApi } from "../api";
-import type { AppConfig, ConnectSnippet, LicenseStatus } from "../types";
+import type { AppConfig, LicenseStatus } from "../types";
 import { ProvidersScreen } from "./Providers";
 import { DevicesScreen } from "./Devices";
 
@@ -186,7 +186,7 @@ const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void })
       </div>
       <div className="flex flex-col gap-2">
         <Label>Capability limits</Label>
-        {config.agent.mandates.map((m, i) => {
+        {(config.agent.mandates ?? []).map((m, i) => {
           const isPay = m.scope.capability === "pay";
           return (
             <div key={m.capability} className="rounded-[var(--radius-md)] border px-3 py-3" style={{ borderColor: "var(--line)" }}>
@@ -260,46 +260,104 @@ const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void })
   );
 };
 
+/** Build the IDE MCP config snippet with the tenant token + relay URL baked in. */
+const buildConnectSnippet = (token: string): string => {
+  const cloudUrl =
+    (import.meta.env.VITE_AGENTGRID_API as string | undefined) ??
+    "https://aegis-backend-production-a853.up.railway.app";
+  return JSON.stringify(
+    {
+      mcpServers: {
+        agentgrid: {
+          command: "agent-grid-mcp",
+          env: { AGENTGRID_TOKEN: token, AGENTGRID_CLOUD_URL: cloudUrl },
+        },
+      },
+    },
+    null,
+    2,
+  );
+};
+
 const ConnectStep = ({ api }: { api: ApprovalApi }) => {
-  const [snippet, setSnippet] = useState<ConnectSnippet | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  useEffect(() => { void api.getConnect().then(setSnippet); }, [api]);
-  const text = useMemo(() => snippet === null ? "" : JSON.stringify(snippet.snippet, null, 2), [snippet]);
+  const [connected, setConnected] = useState(false);
+
+  // Mint a connection token bound to this tenant so the snippet is ready to paste.
+  useEffect(() => {
+    setError(null);
+    api.issueAgentToken()
+      .then((r) => setToken(r.token))
+      .catch((err) => { console.error(err); setError("Could not create a connection token. Is the backend reachable?"); });
+  }, [api]);
+
+  // Live "waiting for your agent…" — flip to success once an agent enrolls.
+  useEffect(() => {
+    if (token === null || connected) return;
+    let active = true;
+    const tick = async () => {
+      try {
+        const agents = await api.listAgents();
+        if (active && agents.length > 0) setConnected(true);
+      } catch { /* keep waiting */ }
+    };
+    void tick();
+    const h = setInterval(() => void tick(), 3000);
+    return () => { active = false; clearInterval(h); };
+  }, [api, token, connected]);
+
+  const text = useMemo(() => (token === null ? "" : buildConnectSnippet(token)), [token]);
+
+  if (error !== null) {
+    return (
+      <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
+        <p className="font-semibold">{error}</p>
+      </div>
+    );
+  }
+  if (token === null) {
+    return <div className="text-sm text-[var(--muted)] animate-pulse">Creating your connection token…</div>;
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-[var(--muted)]">
-        Agent Grid gives your AI governed access to tools. Configure it in your AI client:
+        Install the agent once, then paste this into your AI client's MCP config (Claude Desktop, Cursor, …) and restart it.
       </p>
+      <div className="rounded-[var(--radius-md)] p-3 text-xs mono" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>
+        <span className="text-[var(--subtle)]"># install once</span><br />
+        npm i -g agent-grid-mcp
+      </div>
 
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--subtle)] mb-2">MCP Configuration</p>
-        <p className="text-xs text-[var(--muted)] mb-3">
-          Copy this JSON block into your AI client's MCP settings (Claude Desktop, Cursor, etc.) and restart it.
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--subtle)] mb-2">MCP configuration (includes your token)</p>
         <div className="flex items-stretch gap-2">
-          <pre
-            className="flex-1 mono overflow-x-auto rounded-[var(--radius-md)] p-3 text-xs text-[var(--text)]"
-            style={{ background: "var(--surface-2)" }}
-          >
-            {text}
-          </pre>
+          <pre className="flex-1 mono overflow-x-auto rounded-[var(--radius-md)] p-3 text-xs text-[var(--text)]" style={{ background: "var(--surface-2)" }}>{text}</pre>
           <button
             onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-            className="px-3 py-2 rounded-[var(--radius-md)] cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-2 rounded-[var(--radius-md)] cursor-pointer flex items-center gap-1.5 self-start"
             style={{ background: "var(--surface-2)", color: "var(--muted)" }}
           >
             {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
             <span className="text-xs font-medium">{copied ? "Copied" : "Copy"}</span>
           </button>
         </div>
+        <p className="mt-2 text-[11px] text-[var(--subtle)]">Keep this token private — anyone with it can enroll an agent to your account.</p>
       </div>
 
-      <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--ok-dim)", color: "var(--ok)" }}>
-        <p className="font-semibold text-xs">✓ All set! 🎉</p>
-        <p className="mt-1 text-xs opacity-80">
-          Your AI now has governed access to the capabilities you enabled. Agent Grid will show approvals in this console whenever your AI needs to step up.
-        </p>
-      </div>
+      {connected ? (
+        <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--ok-dim)", color: "var(--ok)" }}>
+          <p className="font-semibold text-xs">✓ Your agent is connected! 🎉</p>
+          <p className="mt-1 text-xs opacity-80">Approvals will appear in this console whenever it needs to step up.</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>
+          <span className="h-2 w-2 rounded-full animate-pulse" style={{ background: "var(--warn)" }} />
+          <span className="text-xs">Waiting for your agent to connect…</span>
+        </div>
+      )}
     </div>
   );
 };

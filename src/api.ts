@@ -94,6 +94,8 @@ export interface ApprovalApi {
   activateLicense(params: { key: string }): Promise<{ ok: boolean; reason?: string }>;
   deactivateLicense(): Promise<{ ok: boolean }>;
   getConnect(): Promise<ConnectSnippet>;
+  /** Mint a connection token bound to the signed-in tenant (onboarding). */
+  issueAgentToken(): Promise<{ token: string }>;
   /** Provider connection status for the Providers screen (task 4.4). */
   getProviders(): Promise<ProvidersView>;
   /** Linked phone devices for the Devices screen (task 4.5). */
@@ -241,7 +243,10 @@ export class SeedApi implements ApprovalApi {
     return { ok: true };
   }
   async getConnect(): Promise<ConnectSnippet> {
-    return { snippet: { mcpServers: { agentgrid: { command: "npx", args: ["tsx", "packages/server/src/main.ts"] } } } };
+    return { snippet: { mcpServers: { agentgrid: { command: "agent-grid-mcp" } } } };
+  }
+  async issueAgentToken(): Promise<{ token: string }> {
+    return { token: "ag_demo_token_xxxxxxxxxxxxxxxxxxxx" };
   }
   async getProviders(): Promise<ProvidersView> {
     return {
@@ -495,6 +500,16 @@ export class HttpApi implements ApprovalApi {
     const res = await fetch(`${this.#base}/api/connect`, { headers });
     if (!res.ok) throw new Error(`connect fetch failed: ${res.status}`);
     return (await res.json()) as ConnectSnippet;
+  }
+  async issueAgentToken(): Promise<{ token: string }> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
+    const res = await fetch(`${this.#base}/api/tokens`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ label: "console" }),
+    });
+    if (!res.ok) throw new Error(`token issue failed: ${res.status}`);
+    return (await res.json()) as { token: string };
   }
   async getProviders(): Promise<ProvidersView> {
     const headers = await this.#getHeaders();

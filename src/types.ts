@@ -273,7 +273,7 @@ export interface LoadedConfig {
 }
 
 export interface ConnectSnippet {
-  readonly snippet: { readonly mcpServers: Record<string, { command: string; args: string[] }> };
+  readonly snippet: { readonly mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> };
 }
 
 // ─── Providers (4.4) ─────────────────────────────────────────────────────────

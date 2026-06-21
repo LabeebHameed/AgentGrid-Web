@@ -177,7 +177,7 @@ const AgentConfigSection = ({ api }: { api: ApprovalApi }) => {
         <input className={input} style={{ borderColor: "var(--line)", maxWidth: 320 }} value={config.agent.displayName} onChange={(e) => setConfig({ ...config, agent: { ...config.agent, displayName: e.target.value } })} />
       </div>
       <div className="flex flex-col gap-3">
-        {config.agent.mandates.map((m, i) => (
+        {(config.agent.mandates ?? []).map((m, i) => (
           <MandateEditor
             key={m.capability}
             mandate={m}
