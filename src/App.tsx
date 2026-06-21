@@ -180,6 +180,12 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setActivity(ac);
       setConnectionError(null);
       setDataLoaded(true);
+      // Auto-dismiss onboarding once we know agents exist — prevents the screen
+      // from toggling back to OnboardingFlow if a poll briefly returns []
+      if (ag.length > 0) {
+        localStorage.setItem("agentgrid_onboarding_done", "1");
+        setOnboardingDismissed(true);
+      }
     } catch (err) {
       console.error(err);
       setConnectionError("Backend connection failed — retrying. Check that the relay is reachable.");
