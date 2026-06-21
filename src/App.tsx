@@ -11,8 +11,6 @@ import {
   Plug,
   Smartphone,
   KeyRound,
-  Copy,
-  Check,
 } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
 import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval } from "./types";
@@ -27,7 +25,7 @@ import { GovernanceConsole } from "./components/Governance";
 import { Settings } from "./components/Settings";
 import { ProvidersScreen } from "./components/Providers";
 import { DevicesScreen } from "./components/Devices";
-import { SetupWizard, useWizardVisible } from "./components/Wizard";
+import { OnboardingFlow } from "./components/Wizard";
 
 type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices";
 
@@ -132,97 +130,6 @@ const NavButton = ({
   </button>
 );
 
-const PremiumSetupScreen = () => {
-  const [copiedInstall, setCopiedInstall] = useState(false);
-  const [copiedLogin, setCopiedLogin] = useState(false);
-
-  const installCmd = "npm install -g agent-grid-mcp";
-  const loginCmd = "agent-grid-mcp login";
-
-  const copyInstall = () => {
-    void navigator.clipboard.writeText(installCmd);
-    setCopiedInstall(true);
-    setTimeout(() => setCopiedInstall(false), 1500);
-  };
-
-  const copyLogin = () => {
-    void navigator.clipboard.writeText(loginCmd);
-    setCopiedLogin(true);
-    setTimeout(() => setCopiedLogin(false), 1500);
-  };
-
-  return (
-    <div className="flex min-h-[80vh] flex-col items-center justify-center py-12 text-center select-none">
-      <div className="relative mb-8">
-        <div className="absolute inset-0 rounded-full bg-indigo-500/20 blur-2xl animate-pulse" />
-        <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-          <Bot className="h-10 w-10 text-indigo-400 animate-bounce" style={{ animationDuration: "3s" }} />
-        </div>
-      </div>
-
-      <h1 className="text-2xl font-bold tracking-tight text-white bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent sm:text-3xl">
-        Connect your AI agent
-      </h1>
-      <p className="mt-3 max-w-md text-sm text-[#8c8c9e] leading-relaxed">
-        To start securing your AI with AgentGrid, install and run the local MCP gateway on your device.
-      </p>
-
-      <div className="mt-10 w-full max-w-md space-y-4 text-left">
-        <div className="rounded-2xl border border-white/[0.06] bg-black/30 p-5 backdrop-blur-sm">
-          <div className="flex items-start gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-bold text-indigo-400">
-              1
-            </span>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-white">Install AgentGrid MCP</h3>
-              <p className="mt-1 text-xs text-[#8c8c9e]">Run this command in your terminal to install the CLI package globally.</p>
-              
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-black/50 border border-white/[0.05] p-2">
-                <code className="mono text-xs text-indigo-300 truncate px-2 select-all">{installCmd}</code>
-                <button
-                  onClick={copyInstall}
-                  className="rounded-md p-1.5 hover:bg-white/5 text-[#8c8c9e] hover:text-white transition-colors cursor-pointer"
-                >
-                  {copiedInstall ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/[0.06] bg-black/30 p-5 backdrop-blur-sm">
-          <div className="flex items-start gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-bold text-indigo-400">
-              2
-            </span>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-white">Authenticate the CLI</h3>
-              <p className="mt-1 text-xs text-[#8c8c9e]">Run the login command. It will automatically authorize this console to secure your agent.</p>
-              
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-black/50 border border-white/[0.05] p-2">
-                <code className="mono text-xs text-indigo-300 truncate px-2 select-all">{loginCmd}</code>
-                <button
-                  onClick={copyLogin}
-                  className="rounded-md p-1.5 hover:bg-white/5 text-[#8c8c9e] hover:text-white transition-colors cursor-pointer"
-                >
-                  {copiedLogin ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-10 flex items-center gap-2.5 text-xs text-[#8c8c9e]">
-        <div className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-        </div>
-        <span>Waiting for your agent to connect...</span>
-      </div>
-    </div>
-  );
-};
 
 interface AppProps {
   readonly getClerkToken?: () => Promise<string | null>;
@@ -252,8 +159,8 @@ export default function App({ getClerkToken }: AppProps = {}) {
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
 
-  // First-run wizard
-  const [wizardVisible, dismissWizard] = useWizardVisible();
+  // Onboarding dismissed flag — user explicitly closed before agent connected
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -326,7 +233,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
         try {
           const { token } = await api.issueAgentToken();
           sessionStorage.removeItem("agentgrid_login_cli_port");
-          const redirectUrl = `http://localhost:${cliPort}/callback?token=${encodeURIComponent(token)}&cloudUrl=${encodeURIComponent(apiBase)}`;
+          const redirectUrl = `http://localhost:${cliPort}/callback?token=${encodeURIComponent(token)}`;
           window.location.href = redirectUrl;
         } catch (err) {
           console.error("Failed to issue token for CLI login:", err);
@@ -366,16 +273,23 @@ export default function App({ getClerkToken }: AppProps = {}) {
     licenseStatus.mode === "enforced" &&
     !licenseStatus.operable;
 
+  // Show onboarding when signed in but no agents connected yet (and not manually dismissed)
+  const showOnboarding = clerkMode && !demo && agents.length === 0 && !onboardingDismissed;
+
+  if (showOnboarding) {
+    return (
+      <div className="flex h-screen overflow-y-auto" style={{ background: "var(--bg)" }}>
+        <OnboardingFlow
+          api={api}
+          agents={agents}
+          onDone={() => setOnboardingDismissed(true)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* First-run wizard overlay */}
-      {wizardVisible && (
-        <SetupWizard
-          api={api}
-          onDone={() => { dismissWizard(); }}
-        />
-      )}
-
       {/* Desktop rail */}
       <aside
         className="hidden w-60 shrink-0 flex-col border-r px-4 py-6 lg:flex"
@@ -467,8 +381,6 @@ export default function App({ getClerkToken }: AppProps = {}) {
 
             {view === "settings" ? (
               <Settings api={api} />
-            ) : !demo && clerkMode && agents.length === 0 ? (
-              <PremiumSetupScreen />
             ) : view === "governance" ? (
               <GovernanceConsole api={api} agents={agents} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
             ) : view === "dashboard" ? (

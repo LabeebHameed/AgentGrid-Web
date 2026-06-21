@@ -1,151 +1,106 @@
-/**
- * First-run setup wizard (task 4.7).
- *
- * A multi-step overlay that guides a new user from zero → connected:
- *   Step 1 → License (activate or skip)
- *   Step 2 → Agent config (name + mandates)
- *   Step 3 → Providers (review which are connected)
- *   Step 4 → Devices (link phone — optional)
- *   Step 5 → Connect your AI (copy MCP snippet)
- *
- * The wizard is shown when `?wizard=1` is in the URL (set by the CLI launcher
- * on first run) or when `localStorage.agentgrid_wizard_done` is not set.
- * Completing or skipping sets the flag and calls `onDone()`.
- */
-
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { Check, ChevronRight, X, KeyRound, Settings2, Plug, Smartphone, Link2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  Check,
+  ChevronRight,
+  Copy,
+  Settings2,
+  Plug,
+  Terminal,
+  ShieldCheck,
+  ChevronDown,
+} from "lucide-react";
 import type { ApprovalApi } from "../api";
-import type { AppConfig, LicenseStatus } from "../types";
+import type { AppConfig, AgentSummary } from "../types";
 import { ProvidersScreen } from "./Providers";
-import { DevicesScreen } from "./Devices";
 
-const WIZARD_DONE_KEY = "agentgrid_wizard_done";
+// ─── Step definitions ─────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: "license", label: "License", icon: <KeyRound className="h-4 w-4" strokeWidth={1.75} aria-hidden />, optional: true },
-  { id: "config", label: "Agent setup", icon: <Settings2 className="h-4 w-4" strokeWidth={1.75} aria-hidden />, optional: false },
+  { id: "limits", label: "Set your limits", icon: <Settings2 className="h-4 w-4" strokeWidth={1.75} aria-hidden /> },
   { id: "providers", label: "Providers", icon: <Plug className="h-4 w-4" strokeWidth={1.75} aria-hidden />, optional: true },
-  { id: "devices", label: "Link phone", icon: <Smartphone className="h-4 w-4" strokeWidth={1.75} aria-hidden />, optional: true },
-  { id: "connect", label: "Connect AI", icon: <Link2 className="h-4 w-4" strokeWidth={1.75} aria-hidden />, optional: false },
+  { id: "connect", label: "Connect your agent", icon: <Terminal className="h-4 w-4" strokeWidth={1.75} aria-hidden /> },
+  { id: "done", label: "Done", icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
 
-// ─── Step components ─────────────────────────────────────────────────────────
+// ─── Shared UI primitives ─────────────────────────────────────────────────────
 
-const num = (scope: Record<string, unknown>, key: string): number =>
-  typeof scope[key] === "number" ? (scope[key] as number) : 0;
-
-const Label = ({ children }: { children: React.ReactNode }) => (
-  <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--subtle)]">{children}</span>
+const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+  <label className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--subtle)" }}>
+    {children}
+  </label>
 );
 
-const inputClass =
-  "w-full rounded-[var(--radius-md)] border bg-transparent px-2.5 py-2 text-sm text-[var(--text)] outline-none";
+const inputCls =
+  "w-full rounded-[var(--radius-md)] border bg-transparent px-3 py-2 text-sm outline-none";
 
-const LicenseStep = ({ api }: { api: ApprovalApi }) => {
-  const [status, setStatus] = useState<LicenseStatus | null>(null);
-  const [key, setKey] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setError(null);
-    api.getLicense()
-      .then(setStatus)
-      .catch((err) => {
-        console.error(err);
-        setError("Connection failed. Make sure your Railway backend is online.");
-      });
-  }, [api]);
-
-  if (error !== null) {
-    return (
-      <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
-        <p className="font-semibold">{error}</p>
-        <p className="mt-1 text-xs opacity-90">
-          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AGENTGRID_API || "same-origin (Vercel host)"}</code>
-        </p>
-      </div>
-    );
-  }
-
-  if (status === null) {
-    return <div className="text-sm text-[var(--muted)] animate-pulse">Connecting to backend...</div>;
-  }
-
-  const activate = async () => {
-    setBusy(true); setMsg(null);
-    try {
-      const r = await api.activateLicense({ key });
-      setMsg(r.ok ? "✓ Activated!" : `Could not activate: ${r.reason ?? "unknown"}`);
-      if (r.ok) { setKey(""); void api.getLicense().then(setStatus); }
-    } finally { setBusy(false); }
+const CopyButton = ({ text }: { text: string }) => {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
-
-  if (status === null) return null;
-  const disabled = status.mode === "disabled";
-
   return (
-    <div className="flex flex-col gap-4">
-      {disabled ? (
-        <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--warn-dim)", color: "var(--warn)" }}>
-          <p className="font-semibold">Testing mode: enforcement is OFF</p>
-          <p className="mt-1 text-xs opacity-80">
-            The agent runs fully without a license right now. You can activate a key later in Settings → License.
-          </p>
-        </div>
-      ) : status.operable ? (
-        <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--ok-dim)", color: "var(--ok)" }}>
-          <p className="font-semibold">Licensed — {status.plan ?? "active"}</p>
-          {status.expiresAt !== null && <p className="mt-0.5 text-xs">Expires {new Date(status.expiresAt).toLocaleDateString()}</p>}
-        </div>
-      ) : (
-        <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", color: "var(--danger)" }}>
-          <p className="font-semibold">Not licensed — {status.reason}</p>
-          <p className="mt-0.5 text-xs">Activate a key below to enable the agent.</p>
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          className={inputClass}
-          style={{ borderColor: "var(--line)", maxWidth: 280 }}
-          placeholder="paste your license key"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-        />
-        <button
-          disabled={busy || key.trim() === ""}
-          onClick={() => void activate()}
-          className="rounded-[var(--radius-md)] px-3.5 py-2 text-sm font-semibold cursor-pointer disabled:opacity-50"
-          style={{ background: "var(--text)", color: "var(--bg)" }}
-        >
-          Activate
-        </button>
-      </div>
-      {msg !== null && <p className="text-xs text-[var(--muted)]">{msg}</p>}
-      <p className="text-xs text-[var(--subtle)]">
-        Don't have a key? You can skip this — the agent runs without a license while enforcement is off.
-      </p>
-    </div>
+    <button
+      onClick={copy}
+      className="rounded-[var(--radius-md)] p-1.5 cursor-pointer transition-colors hover:opacity-80"
+      style={{ color: "var(--subtle)" }}
+      aria-label="Copy"
+    >
+      {copied ? <Check className="h-4 w-4" style={{ color: "var(--ok)" }} /> : <Copy className="h-4 w-4" />}
+    </button>
   );
 };
 
-const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void }) => {
+const CodeBlock = ({ code }: { code: string }) => (
+  <div
+    className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] px-3 py-2"
+    style={{ background: "var(--surface-2)" }}
+  >
+    <code className="mono text-sm truncate select-all" style={{ color: "var(--text)" }}>
+      {code}
+    </code>
+    <CopyButton text={code} />
+  </div>
+);
+
+// ─── Step 1 — Limits ─────────────────────────────────────────────────────────
+
+const centsToDisplay = (minor: number | null | undefined): string =>
+  minor == null || minor === 0 ? "" : (minor / 100).toFixed(2).replace(/\.00$/, "");
+
+const displayToCents = (val: string): number | null => {
+  const n = parseFloat(val.replace(/[$,]/g, ""));
+  if (isNaN(n) || n <= 0) return null;
+  return Math.round(n * 100);
+};
+
+const LimitsStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Local dollar-string state for pay mandate fields
+  const [agentName, setAgentName] = useState("");
+  const [stepUpAmount, setStepUpAmount] = useState("");
+  const [monthlyCapAmount, setMonthlyCapAmount] = useState("");
+
   useEffect(() => {
-    setError(null);
-    api.getConfig()
-      .then((l) => setConfig(l.config))
+    api
+      .getConfig()
+      .then((l) => {
+        setConfig(l.config);
+        setAgentName(l.config.agent.displayName);
+        const pay = l.config.agent.mandates.find((m) => m.capability === "pay");
+        setStepUpAmount(centsToDisplay(pay?.stepUpThresholdMinor));
+        setMonthlyCapAmount(centsToDisplay(pay?.scope.limitPerPeriodMinor as number | undefined));
+      })
       .catch((err) => {
         console.error(err);
-        setError("Connection failed. Make sure your Railway backend is online.");
+        setError("Connection failed. Make sure the backend is reachable.");
       });
   }, [api]);
 
@@ -153,102 +108,117 @@ const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void })
     if (config === null) return;
     setBusy(true);
     try {
-      const r = await api.saveConfig(config);
+      const stepUpMinor = displayToCents(stepUpAmount);
+      const monthlyCapMinor = displayToCents(monthlyCapAmount);
+
+      const mandates = config.agent.mandates.map((m) => {
+        if (m.capability !== "pay") return m;
+        return {
+          ...m,
+          stepUpThresholdMinor: stepUpMinor,
+          scope: {
+            ...m.scope,
+            limitPerPeriodMinor: monthlyCapMinor ?? 0,
+          },
+        };
+      });
+
+      const updated: AppConfig = {
+        ...config,
+        agent: { ...config.agent, displayName: agentName, mandates },
+      };
+      const r = await api.saveConfig(updated);
       if (r.ok) { setSaved(true); onSaved(); }
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (error !== null) {
     return (
-      <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
+      <div
+        className="rounded-[var(--radius-md)] border px-4 py-3 text-sm"
+        style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}
+      >
         <p className="font-semibold">{error}</p>
-        <p className="mt-1 text-xs opacity-90">
-          Currently calling: <code className="mono bg-black/30 px-1 py-0.5 rounded">{import.meta.env.VITE_AGENTGRID_API || "same-origin (Vercel host)"}</code>
-        </p>
       </div>
     );
   }
 
   if (config === null) {
-    return <div className="text-sm text-[var(--muted)] animate-pulse">Loading configuration from backend...</div>;
+    return <p className="text-sm animate-pulse" style={{ color: "var(--muted)" }}>Loading…</p>;
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <Label>Agent name</Label>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel>Agent name</FieldLabel>
         <input
-          className={inputClass}
-          style={{ borderColor: "var(--line)", maxWidth: 320 }}
-          value={config.agent.displayName}
-          onChange={(e) => setConfig({ ...config, agent: { ...config.agent, displayName: e.target.value } })}
+          className={inputCls}
+          style={{ borderColor: "var(--line)", color: "var(--text)" }}
+          value={agentName}
+          onChange={(e) => setAgentName(e.target.value)}
+          placeholder="My AI Assistant"
         />
       </div>
-      <div className="flex flex-col gap-2">
-        <Label>Capability limits</Label>
-        {(config.agent.mandates ?? []).map((m, i) => {
-          const isPay = m.scope.capability === "pay";
-          return (
-            <div key={m.capability} className="rounded-[var(--radius-md)] border px-3 py-3" style={{ borderColor: "var(--line)" }}>
-              <p className="mb-2 text-sm font-semibold capitalize text-[var(--text)]">{m.capability}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {isPay && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <Label>Per-transaction cap (minor)</Label>
-                      <input
-                        className={inputClass} style={{ borderColor: "var(--line)" }} inputMode="numeric"
-                        value={num(m.scope, "limitPerTransactionMinor")}
-                        onChange={(e) => {
-                          const next = config.agent.mandates.map((x, j) =>
-                            j === i ? { ...x, scope: { ...x.scope, limitPerTransactionMinor: Number.parseInt(e.target.value || "0", 10) } } : x
-                          );
-                          setConfig({ ...config, agent: { ...config.agent, mandates: next } });
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <Label>Per-period cap (minor)</Label>
-                      <input
-                        className={inputClass} style={{ borderColor: "var(--line)" }} inputMode="numeric"
-                        value={num(m.scope, "limitPerPeriodMinor")}
-                        onChange={(e) => {
-                          const next = config.agent.mandates.map((x, j) =>
-                            j === i ? { ...x, scope: { ...x.scope, limitPerPeriodMinor: Number.parseInt(e.target.value || "0", 10) } } : x
-                          );
-                          setConfig({ ...config, agent: { ...config.agent, mandates: next } });
-                        }}
-                      />
-                    </div>
-                  </>
-                )}
-                <div className="flex flex-col gap-1">
-                  <Label>Step-up ≥ (minor, blank = never)</Label>
-                  <input
-                    className={inputClass} style={{ borderColor: "var(--line)" }} inputMode="numeric"
-                    value={m.stepUpThresholdMinor ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value.trim();
-                      const next = config.agent.mandates.map((x, j) =>
-                        j === i ? { ...x, stepUpThresholdMinor: v === "" ? null : Number.parseInt(v, 10) } : x
-                      );
-                      setConfig({ ...config, agent: { ...config.agent, mandates: next } });
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        })}
+
+      <div
+        className="rounded-[var(--radius-md)] border px-4 py-4 flex flex-col gap-4"
+        style={{ borderColor: "var(--line)" }}
+      >
+        <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Payment limits</p>
+
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Ask me before any payment over</FieldLabel>
+          <div className="relative max-w-48">
+            <span
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-sm"
+              style={{ color: "var(--muted)" }}
+            >$</span>
+            <input
+              className={inputCls}
+              style={{ borderColor: "var(--line)", color: "var(--text)", paddingLeft: "1.5rem" }}
+              inputMode="decimal"
+              value={stepUpAmount}
+              onChange={(e) => setStepUpAmount(e.target.value)}
+              placeholder="e.g. 20"
+            />
+          </div>
+          <p className="text-xs" style={{ color: "var(--subtle)" }}>
+            Leave blank to always approve, or enter 0.01 to ask every time.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Monthly payment cap</FieldLabel>
+          <div className="relative max-w-48">
+            <span
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-sm"
+              style={{ color: "var(--muted)" }}
+            >$</span>
+            <input
+              className={inputCls}
+              style={{ borderColor: "var(--line)", color: "var(--text)", paddingLeft: "1.5rem" }}
+              inputMode="decimal"
+              value={monthlyCapAmount}
+              onChange={(e) => setMonthlyCapAmount(e.target.value)}
+              placeholder="e.g. 100"
+            />
+          </div>
+          <p className="text-xs" style={{ color: "var(--subtle)" }}>
+            The agent cannot spend more than this total per month.
+          </p>
+        </div>
       </div>
+
       <div className="flex items-center gap-3">
         <button
           disabled={busy}
           onClick={() => void save()}
-          className="rounded-[var(--radius-md)] px-3.5 py-2 text-sm font-semibold cursor-pointer disabled:opacity-50"
+          className="rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold cursor-pointer disabled:opacity-50"
           style={{ background: "var(--text)", color: "var(--bg)" }}
         >
-          Save configuration
+          Save and continue
         </button>
         {saved && (
           <span className="inline-flex items-center gap-1.5 text-sm" style={{ color: "var(--ok)" }}>
@@ -260,247 +230,312 @@ const ConfigStep = ({ api, onSaved }: { api: ApprovalApi; onSaved: () => void })
   );
 };
 
-/** Build the IDE MCP config snippet with the tenant token + relay URL baked in. */
-const buildConnectSnippet = (token: string): string => {
-  const cloudUrl =
-    (import.meta.env.VITE_AGENTGRID_API as string | undefined) ??
-    "https://aegis-backend-production-a853.up.railway.app";
-  return JSON.stringify(
+// ─── Step 2 — Providers ──────────────────────────────────────────────────────
+
+const ProvidersStep = ({ api }: { api: ApprovalApi }) => (
+  <ProvidersScreen api={api} compact />
+);
+
+// ─── Step 3 — Connect your agent ─────────────────────────────────────────────
+
+const buildTokenSnippet = (token: string): string =>
+  JSON.stringify(
     {
       mcpServers: {
         agentgrid: {
           command: "agent-grid-mcp",
-          env: { AGENTGRID_TOKEN: token, AGENTGRID_CLOUD_URL: cloudUrl },
+          env: { AGENTGRID_TOKEN: token },
         },
       },
     },
     null,
     2,
   );
-};
 
-const ConnectStep = ({ api }: { api: ApprovalApi }) => {
+const ConnectStep = ({
+  api,
+  agents,
+  onConnected,
+}: {
+  api: ApprovalApi;
+  agents: readonly AgentSummary[];
+  onConnected: () => void;
+}) => {
   const [token, setToken] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [connected, setConnected] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [showFallback, setShowFallback] = useState(false);
+  const [snippetCopied, setSnippetCopied] = useState(false);
 
-  // Mint a connection token bound to this tenant so the snippet is ready to paste.
+  const connected = agents.length > 0;
+
   useEffect(() => {
-    setError(null);
-    api.issueAgentToken()
+    api
+      .issueAgentToken()
       .then((r) => setToken(r.token))
-      .catch((err) => { console.error(err); setError("Could not create a connection token. Is the backend reachable?"); });
+      .catch((err) => {
+        console.error(err);
+        setTokenError("Could not create a connection token.");
+      });
   }, [api]);
 
-  // Live "waiting for your agent…" — flip to success once an agent enrolls.
+  // Auto-advance when agent connects
   useEffect(() => {
-    if (token === null || connected) return;
-    let active = true;
-    const tick = async () => {
-      try {
-        const agents = await api.listAgents();
-        if (active && agents.length > 0) setConnected(true);
-      } catch { /* keep waiting */ }
-    };
-    void tick();
-    const h = setInterval(() => void tick(), 3000);
-    return () => { active = false; clearInterval(h); };
-  }, [api, token, connected]);
+    if (connected) onConnected();
+  }, [connected, onConnected]);
 
-  const text = useMemo(() => (token === null ? "" : buildConnectSnippet(token)), [token]);
+  const snippet = token !== null ? buildTokenSnippet(token) : "";
 
-  if (error !== null) {
+  const copySnippet = () => {
+    void navigator.clipboard.writeText(snippet);
+    setSnippetCopied(true);
+    setTimeout(() => setSnippetCopied(false), 1500);
+  };
+
+  if (connected) {
     return (
-      <div className="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style={{ background: "var(--danger-dim)", borderColor: "var(--danger)", color: "var(--danger)" }}>
-        <p className="font-semibold">{error}</p>
+      <div
+        className="rounded-[var(--radius-md)] px-4 py-3 flex items-center gap-2 text-sm"
+        style={{ background: "var(--ok-dim)", color: "var(--ok)" }}
+      >
+        <Check className="h-4 w-4" aria-hidden />
+        <span className="font-semibold">Agent connected!</span>
+        <span className="opacity-80">Advancing…</span>
       </div>
     );
   }
-  if (token === null) {
-    return <div className="text-sm text-[var(--muted)] animate-pulse">Creating your connection token…</div>;
-  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-[var(--muted)]">
-        Install the agent once, then paste this into your AI client's MCP config (Claude Desktop, Cursor, …) and restart it.
+    <div className="flex flex-col gap-5">
+      <p className="text-sm" style={{ color: "var(--muted)" }}>
+        Run these two commands in your terminal. The login command will open this browser and connect your agent automatically.
       </p>
-      <div className="rounded-[var(--radius-md)] p-3 text-xs mono" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>
-        <span className="text-[var(--subtle)]"># install once</span><br />
-        npm i -g agent-grid-mcp
+
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Step 1 — Install</FieldLabel>
+          <CodeBlock code="npm install -g agent-grid-mcp" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Step 2 — Authenticate</FieldLabel>
+          <CodeBlock code="agent-grid-mcp login" />
+        </div>
       </div>
 
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--subtle)] mb-2">MCP configuration (includes your token)</p>
-        <div className="flex items-stretch gap-2">
-          <pre className="flex-1 mono overflow-x-auto rounded-[var(--radius-md)] p-3 text-xs text-[var(--text)]" style={{ background: "var(--surface-2)" }}>{text}</pre>
-          <button
-            onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-            className="px-3 py-2 rounded-[var(--radius-md)] cursor-pointer flex items-center gap-1.5 self-start"
-            style={{ background: "var(--surface-2)", color: "var(--muted)" }}
-          >
-            {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-            <span className="text-xs font-medium">{copied ? "Copied" : "Copy"}</span>
-          </button>
-        </div>
-        <p className="mt-2 text-[11px] text-[var(--subtle)]">Keep this token private — anyone with it can enroll an agent to your account.</p>
+      <div className="flex items-center gap-2" style={{ color: "var(--muted)" }}>
+        <span
+          className="relative flex h-2 w-2 shrink-0"
+        >
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "var(--warn)" }} />
+          <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: "var(--warn)" }} />
+        </span>
+        <span className="text-sm">Waiting for your agent to connect…</span>
       </div>
 
-      {connected ? (
-        <div className="rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--ok-dim)", color: "var(--ok)" }}>
-          <p className="font-semibold text-xs">✓ Your agent is connected! 🎉</p>
-          <p className="mt-1 text-xs opacity-80">Approvals will appear in this console whenever it needs to step up.</p>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 rounded-[var(--radius-md)] px-4 py-3 text-sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>
-          <span className="h-2 w-2 rounded-full animate-pulse" style={{ background: "var(--warn)" }} />
-          <span className="text-xs">Waiting for your agent to connect…</span>
-        </div>
-      )}
+      {/* Manual token fallback — for AI clients that can't do browser OAuth */}
+      <div className="border-t pt-4" style={{ borderColor: "var(--line)" }}>
+        <button
+          onClick={() => setShowFallback((v) => !v)}
+          className="flex items-center gap-1.5 text-xs cursor-pointer"
+          style={{ color: "var(--subtle)" }}
+        >
+          <ChevronDown
+            className="h-3.5 w-3.5 transition-transform"
+            style={{ transform: showFallback ? "rotate(180deg)" : "rotate(0deg)" }}
+            aria-hidden
+          />
+          Using an AI client that can't do browser OAuth? Paste a token instead.
+        </button>
+
+        {showFallback && (
+          <div className="mt-3 flex flex-col gap-2">
+            {tokenError !== null ? (
+              <p className="text-xs" style={{ color: "var(--danger)" }}>{tokenError}</p>
+            ) : token === null ? (
+              <p className="text-xs animate-pulse" style={{ color: "var(--muted)" }}>Minting token…</p>
+            ) : (
+              <>
+                <p className="text-xs" style={{ color: "var(--subtle)" }}>
+                  Paste this into your AI client's MCP config and restart it. Keep the token private.
+                </p>
+                <div className="flex items-start gap-2">
+                  <pre
+                    className="mono flex-1 overflow-x-auto rounded-[var(--radius-md)] p-3 text-xs"
+                    style={{ background: "var(--surface-2)", color: "var(--text)" }}
+                  >
+                    {snippet}
+                  </pre>
+                  <button
+                    onClick={copySnippet}
+                    className="shrink-0 flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-2 text-xs cursor-pointer"
+                    style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+                  >
+                    {snippetCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {snippetCopied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ─── Wizard shell ─────────────────────────────────────────────────────────────
+// ─── Step 4 — Done ────────────────────────────────────────────────────────────
 
-export const useWizardVisible = (): [boolean, () => void] => {
-  const [visible, setVisible] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("wizard")) return true;
-    return localStorage.getItem(WIZARD_DONE_KEY) === null;
-  });
+const DoneStep = ({ agentName, onFinish }: { agentName: string; onFinish: () => void }) => (
+  <div className="flex flex-col items-center gap-4 py-6 text-center">
+    <span
+      className="grid h-16 w-16 place-items-center rounded-full"
+      style={{ background: "var(--ok-dim)" }}
+    >
+      <ShieldCheck className="h-8 w-8" style={{ color: "var(--ok)" }} strokeWidth={1.5} aria-hidden />
+    </span>
+    <div>
+      <h3 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+        {agentName || "Your agent"} is connected
+      </h3>
+      <p className="mt-1 text-sm max-w-xs" style={{ color: "var(--muted)" }}>
+        Approval requests will appear in your inbox whenever the agent needs to step up. You're in control.
+      </p>
+    </div>
+    <button
+      onClick={onFinish}
+      className="mt-2 rounded-[var(--radius-md)] px-5 py-2.5 text-sm font-semibold cursor-pointer"
+      style={{ background: "var(--text)", color: "var(--bg)" }}
+    >
+      Go to dashboard
+    </button>
+  </div>
+);
 
-  const dismiss = useCallback(() => {
-    localStorage.setItem(WIZARD_DONE_KEY, "1");
-    // Remove ?wizard from URL without reload
-    const url = new URL(window.location.href);
-    url.searchParams.delete("wizard");
-    window.history.replaceState({}, "", url.toString());
-    setVisible(false);
-  }, []);
+// ─── OnboardingFlow shell ─────────────────────────────────────────────────────
 
-  return [visible, dismiss];
-};
+export interface OnboardingFlowProps {
+  readonly api: ApprovalApi;
+  readonly agents: readonly AgentSummary[];
+  readonly onDone: () => void;
+}
 
-export const SetupWizard = ({ api, onDone }: { api: ApprovalApi; onDone: () => void }) => {
-  const [step, setStep] = useState<StepId>("license");
-  const [configSaved, setConfigSaved] = useState(false);
+export const OnboardingFlow = ({ api, agents, onDone }: OnboardingFlowProps) => {
+  const [step, setStep] = useState<StepId>("limits");
+  const [limitsSaved, setLimitsSaved] = useState(false);
+  const [agentName, setAgentName] = useState("");
 
   const currentIdx = STEPS.findIndex((s) => s.id === step);
   const isLast = currentIdx === STEPS.length - 1;
 
-  const next = () => {
+  const goNext = useCallback(() => {
     if (isLast) { onDone(); return; }
     setStep(STEPS[currentIdx + 1]!.id);
-  };
-  const skip = () => next();
+  }, [isLast, currentIdx, onDone]);
+
+  // Capture agent name after it's saved so DoneStep can show it
+  useEffect(() => {
+    if (agents.length > 0 && agentName === "") {
+      setAgentName(agents[0]!.displayName);
+    }
+  }, [agents, agentName]);
+
+  const canAdvance = step !== "limits" || limitsSaved;
+  const isOptional = "optional" in (STEPS[currentIdx] ?? {}) && (STEPS[currentIdx] as { optional?: boolean }).optional === true;
 
   return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Agent Grid setup wizard"
-    >
-      <div
-        className="relative flex w-full max-w-lg flex-col rounded-[var(--radius-xl)] border shadow-xl"
-        style={{ background: "var(--surface)", borderColor: "var(--line)" }}
-      >
-        {/* Close */}
-        <button
-          onClick={onDone}
-          className="absolute right-4 top-4 grid h-7 w-7 place-items-center rounded-[var(--radius-md)] cursor-pointer"
-          style={{ color: "var(--muted)" }}
-          aria-label="Skip wizard"
+    <div className="mx-auto max-w-lg px-4 py-12">
+      {/* Header */}
+      <div className="mb-8 text-center">
+        <div
+          className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl"
+          style={{ background: "var(--surface-2)" }}
         >
-          <X className="h-4 w-4" strokeWidth={2} aria-hidden />
-        </button>
-
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--subtle)]">
-            Setup wizard · step {currentIdx + 1} of {STEPS.length}
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-[var(--text)]">
-            {STEPS[currentIdx]?.label}
-          </h2>
-
-          {/* Progress steps */}
-          <div className="mt-4 flex gap-2">
-            {STEPS.map((s, i) => (
-              <button
-                key={s.id}
-                onClick={() => setStep(s.id)}
-                className="flex-1 rounded-full cursor-pointer"
-                style={{
-                  height: 4,
-                  background: i < currentIdx
-                    ? "var(--ok)"
-                    : i === currentIdx
-                      ? "var(--text)"
-                      : "var(--line)",
-                }}
-                aria-label={`Go to step: ${s.label}`}
-              />
-            ))}
-          </div>
+          <ShieldCheck className="h-7 w-7" style={{ color: "var(--text)" }} strokeWidth={1.5} aria-hidden />
         </div>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text)" }}>
+          Set up Agent Grid
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+          Step {currentIdx + 1} of {STEPS.length} — {STEPS[currentIdx]?.label}
+        </p>
+      </div>
 
-        {/* Step nav pills */}
-        <div className="flex gap-2 overflow-x-auto px-6 pb-3">
-          {STEPS.map((s, i) => (
+      {/* Progress bar */}
+      <div className="mb-6 flex gap-1.5">
+        {STEPS.map((s, i) => (
+          <div
+            key={s.id}
+            className="h-1 flex-1 rounded-full"
+            style={{
+              background:
+                i < currentIdx
+                  ? "var(--ok)"
+                  : i === currentIdx
+                    ? "var(--text)"
+                    : "var(--line)",
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Step content */}
+      <div
+        className="rounded-[var(--radius-xl)] border px-6 py-6"
+        style={{ borderColor: "var(--line)", background: "var(--surface)" }}
+      >
+        <h2 className="mb-4 text-base font-semibold" style={{ color: "var(--text)" }}>
+          {STEPS[currentIdx]?.label}
+          {isOptional && (
+            <span className="ml-2 text-xs font-normal" style={{ color: "var(--subtle)" }}>
+              (optional)
+            </span>
+          )}
+        </h2>
+
+        {step === "limits" && (
+          <LimitsStep
+            api={api}
+            onSaved={() => {
+              setLimitsSaved(true);
+              // capture name for DoneStep
+              api.getConfig().then((l) => setAgentName(l.config.agent.displayName)).catch(() => {});
+            }}
+          />
+        )}
+        {step === "providers" && <ProvidersStep api={api} />}
+        {step === "connect" && (
+          <ConnectStep api={api} agents={agents} onConnected={goNext} />
+        )}
+        {step === "done" && <DoneStep agentName={agentName} onFinish={onDone} />}
+      </div>
+
+      {/* Footer nav — hide on done step */}
+      {step !== "done" && (
+        <div className="mt-4 flex items-center justify-between">
+          {isOptional ? (
             <button
-              key={s.id}
-              onClick={() => setStep(s.id)}
-              className="flex shrink-0 items-center gap-1.5 rounded-[var(--radius-full)] px-2.5 py-1 text-xs font-medium cursor-pointer"
-              style={{
-                background: s.id === step ? "var(--surface-2)" : "transparent",
-                color: i <= currentIdx ? "var(--text)" : "var(--subtle)",
-              }}
+              onClick={goNext}
+              className="text-sm cursor-pointer hover:opacity-80"
+              style={{ color: "var(--muted)" }}
             >
-              {i < currentIdx ? <Check className="h-3 w-3" style={{ color: "var(--ok)" }} aria-hidden /> : s.icon}
-              {s.label}
-              {s.optional && <span className="opacity-60">(optional)</span>}
-            </button>
-          ))}
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 pb-2" style={{ maxHeight: "50vh" }}>
-          {step === "license" && <LicenseStep api={api} />}
-          {step === "config" && <ConfigStep api={api} onSaved={() => setConfigSaved(true)} />}
-          {step === "providers" && <ProvidersScreen api={api} compact />}
-          {step === "devices" && <DevicesScreen api={api} compact />}
-          {step === "connect" && <ConnectStep api={api} />}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t px-6 py-4" style={{ borderColor: "var(--line)" }}>
-          {STEPS[currentIdx]?.optional ? (
-            <button
-              onClick={skip}
-              className="text-sm text-[var(--muted)] cursor-pointer hover:text-[var(--text)]"
-            >
-              Skip this step
+              Skip for now
             </button>
           ) : (
             <span />
           )}
-          <button
-            onClick={next}
-            disabled={step === "config" && !configSaved}
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold cursor-pointer disabled:opacity-40"
-            style={{ background: "var(--text)", color: "var(--bg)" }}
-          >
-            {isLast ? "Finish" : "Next"}
-            {!isLast && <ChevronRight className="h-4 w-4" aria-hidden />}
-          </button>
+
+          {step !== "connect" && (
+            <button
+              onClick={goNext}
+              disabled={!canAdvance}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold cursor-pointer disabled:opacity-40"
+              style={{ background: "var(--text)", color: "var(--bg)" }}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </button>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };

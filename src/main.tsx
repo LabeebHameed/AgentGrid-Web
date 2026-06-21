@@ -6,6 +6,10 @@ import "./index.css";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
+// Must run before Clerk changes the URL during auth flow
+const _cliPort = new URLSearchParams(window.location.search).get("login_cli_port");
+if (_cliPort) sessionStorage.setItem("agentgrid_login_cli_port", _cliPort);
+
 const root = document.getElementById("root");
 if (root === null) throw new Error("missing #root");
 
