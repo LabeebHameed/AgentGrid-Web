@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
 import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval } from "./types";
-import { SignedIn, SignedOut, SignIn, useAuth } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignIn, UserButton, useAuth } from "@clerk/clerk-react";
 import { shortDid } from "./lib/format";
 import { useMediaQuery, useNow } from "./lib/useMediaQuery";
 import { InboxList } from "./components/InboxList";
@@ -136,6 +136,11 @@ interface AppProps {
 }
 
 export default function App({ getClerkToken }: AppProps = {}) {
+  // Clerk mode is active whenever the auth token getter is wired in (see
+  // ClerkAppContent). Demo/seed mode passes no getter, so the Clerk-only UI
+  // (sign-out UserButton) stays hidden and never renders outside ClerkProvider.
+  const clerkMode = getClerkToken !== undefined;
+
   useEffect(() => {
     if (getClerkToken && api instanceof HttpApi) {
       api.setGetClerkToken(getClerkToken);
@@ -290,13 +295,19 @@ export default function App({ getClerkToken }: AppProps = {}) {
         </nav>
 
         <div className="mt-auto flex items-center gap-3 rounded-[var(--radius-md)] border px-3 py-3" style={{ borderColor: "var(--line)" }}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-full)]" style={{ background: "var(--surface-3)" }}>
-            <Bot className="h-4 w-4 text-[var(--muted)]" strokeWidth={1.75} aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-[var(--text)]">Agent Grid Agent</p>
-            <p className="mono truncate text-[11px] text-[var(--subtle)]">{shortDid(AGENT)}</p>
-          </div>
+          {clerkMode ? (
+            <UserButton showName afterSignOutUrl="/" />
+          ) : (
+            <>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-full)]" style={{ background: "var(--surface-3)" }}>
+                <Bot className="h-4 w-4 text-[var(--muted)]" strokeWidth={1.75} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-[var(--text)]">Agent Grid Agent</p>
+                <p className="mono truncate text-[11px] text-[var(--subtle)]">{shortDid(AGENT)}</p>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 
@@ -307,6 +318,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-[var(--text)]" strokeWidth={1.75} aria-hidden />
             <span className="font-semibold tracking-tight text-[var(--text)]">Agent Grid</span>
+            {clerkMode && <UserButton afterSignOutUrl="/" />}
           </div>
           <div className="flex gap-1 rounded-[var(--radius-md)] p-1" style={{ background: "var(--surface-2)" }}>
             {(["governance", "dashboard", "inbox", "history", "providers", "devices", "settings"] as View[]).map((v) => (
