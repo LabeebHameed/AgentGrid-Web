@@ -28,7 +28,6 @@ import { Settings } from "./components/Settings";
 import { ProvidersScreen } from "./components/Providers";
 import { DevicesScreen } from "./components/Devices";
 import { SetupWizard, useWizardVisible } from "./components/Wizard";
-import { BridgeSetup } from "./components/BridgeSetup";
 
 type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices";
 
@@ -250,11 +249,6 @@ export default function App({ getClerkToken }: AppProps = {}) {
   const [busy, setBusy] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  // The BridgeSetup flow is for LOCAL same-origin dev (no API base). In hosted
-  // Clerk mode the agent connects out via a token — there is no local bridge to
-  // set up — so a transient backend hiccup must never swap the whole console for
-  // the bridge screen; the inline connection banner covers that instead.
-  const [showBridgeSetup, setShowBridgeSetup] = useState(!demo && !clerkMode && apiBase === "");
   const isLg = useMediaQuery("(min-width: 1024px)");
   const nowMs = useNow(1000);
 
@@ -276,9 +270,6 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setConnectionError(null);
     } catch (err) {
       console.error(err);
-      if (!demo && !clerkMode && !showBridgeSetup) {
-        setShowBridgeSetup(true);
-      }
       setConnectionError("Backend connection failed — retrying. Check that the relay is reachable.");
     }
   }, []);
@@ -320,13 +311,21 @@ export default function App({ getClerkToken }: AppProps = {}) {
   // CLI Login redirect handler
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const cliPort = params.get("login_cli_port");
+    let cliPort = params.get("login_cli_port");
+
+    if (cliPort) {
+      sessionStorage.setItem("agentgrid_login_cli_port", cliPort);
+    } else {
+      cliPort = sessionStorage.getItem("agentgrid_login_cli_port");
+    }
+
     if (!cliPort) return;
 
     if (getClerkToken) {
       void (async () => {
         try {
           const { token } = await api.issueAgentToken();
+          sessionStorage.removeItem("agentgrid_login_cli_port");
           const redirectUrl = `http://localhost:${cliPort}/callback?token=${encodeURIComponent(token)}&cloudUrl=${encodeURIComponent(apiBase)}`;
           window.location.href = redirectUrl;
         } catch (err) {
@@ -369,16 +368,8 @@ export default function App({ getClerkToken }: AppProps = {}) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Bridge setup — shown when backend is unreachable and not demo mode */}
-      {showBridgeSetup && (
-        <BridgeSetup
-          apiBase={apiBase || "http://localhost:8787"}
-          onConnected={() => { setShowBridgeSetup(false); void refresh(); }}
-        />
-      )}
-
       {/* First-run wizard overlay */}
-      {!showBridgeSetup && wizardVisible && (
+      {wizardVisible && (
         <SetupWizard
           api={api}
           onDone={() => { dismissWizard(); }}
@@ -387,7 +378,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
 
       {/* Desktop rail */}
       <aside
-        className={`hidden w-60 shrink-0 flex-col border-r px-4 py-6 lg:flex ${showBridgeSetup ? "opacity-50 pointer-events-none" : ""}`}
+        className="hidden w-60 shrink-0 flex-col border-r px-4 py-6 lg:flex"
         style={{ borderColor: "var(--line)", background: "var(--surface)" }}
       >
         <div className="flex items-center gap-2.5 px-2">
@@ -429,7 +420,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
       </aside>
 
       {/* Main */}
-      <main className={`flex min-w-0 flex-1 flex-col ${showBridgeSetup ? "opacity-50 pointer-events-none" : ""}`}>
+      <main className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
         <header className="flex items-center justify-between border-b px-5 py-4 lg:hidden" style={{ borderColor: "var(--line)" }}>
           <div className="flex items-center gap-2">
