@@ -228,7 +228,12 @@ export const Dashboard = ({
   busy: boolean;
   onFreeze: (params: { agentDid: string; reason: string }) => void;
   onUnfreeze: (params: { agentDid: string }) => void;
-}) => (
+}) => {
+  const filteredActivity = selectedAgentDid
+    ? activity.filter((entry) => entry.agentDid === selectedAgentDid)
+    : activity;
+
+  return (
   <div className="flex flex-col gap-8">
     <section>
       <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text)]">Agents</h1>
@@ -253,7 +258,7 @@ export const Dashboard = ({
         <ActivityIcon className="h-5 w-5 text-[var(--muted)]" strokeWidth={1.75} aria-hidden />
         <h2 className="text-lg font-semibold tracking-tight text-[var(--text)]">Live activity</h2>
       </div>
-      <ActivityFeed entries={activity} />
+      <ActivityFeed entries={filteredActivity} />
     </section>
   </div>
-);
+);};
