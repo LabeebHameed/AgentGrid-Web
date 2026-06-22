@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
   Download,
   AlertTriangle,
+  Wallet,
 } from "lucide-react";
 import type { ApprovalApi, PolicyFilter } from "../api";
 import type {
@@ -25,6 +26,7 @@ import type {
   Verdict,
   VaultEntryView,
   VirtualCardView,
+  ServiceAccountView,
 } from "../types";
 import { shortDid, formatClock } from "../lib/format";
 
@@ -32,13 +34,14 @@ import { shortDid, formatClock } from "../lib/format";
 const money = (minor: number, currency: string): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency }).format(minor / 100);
 
-type Section = PrimitiveKind | "activity" | "overview";
+type Section = PrimitiveKind | "activity" | "overview" | "wallet";
 
 const SECTIONS: readonly { id: Section; label: string; icon: typeof ShieldCheck }[] = [
   { id: "mandate", label: "Mandates", icon: ScrollText },
   { id: "policy", label: "Policy", icon: ShieldCheck },
   { id: "hardLimits", label: "Cards", icon: CreditCard },
   { id: "vault", label: "Vault", icon: KeyRound },
+  { id: "wallet", label: "Wallet", icon: Wallet },
   { id: "audit", label: "Audit", icon: FileCheck2 },
   { id: "identity", label: "Passport", icon: BadgeCheck },
   { id: "activity", label: "Live activity", icon: ActivityIcon },
@@ -476,6 +479,33 @@ const VaultView = ({ entries, statement }: { entries: readonly VaultEntryView[];
   </>
 );
 
+const WalletView = ({ accounts }: { accounts: readonly ServiceAccountView[] }) => (
+  <>
+    <SectionTitle title="Wallet" subtitle="Sites and logins the agent has recorded — credential values are never stored here." />
+    {accounts.length === 0 ? (
+      <Empty text="No saved accounts yet. The agent will add entries here when it signs up or logs in to a site." />
+    ) : (
+      <div className="flex flex-col gap-2">
+        {accounts.map((acc) => (
+          <div key={acc.service} className="flex items-center justify-between rounded-[var(--radius-md)] border px-3.5 py-2.5" style={{ borderColor: "var(--line)" }}>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--text)]">{acc.service}</p>
+              <p className="truncate text-xs text-[var(--subtle)]">{acc.loginEmail}</p>
+            </div>
+            <div className="shrink-0 text-right text-xs text-[var(--muted)]">
+              <p>{acc.ownership === "agent-owned" ? "agent-owned" : "user-provided"}</p>
+              <p className="text-[var(--subtle)]"
+                style={{ color: acc.status === "active" ? "var(--ok)" : acc.status === "pending" ? "var(--warn)" : "var(--muted)" }}>
+                {acc.status}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+);
+
 const AuditViewPanel = ({ audit, onExport }: { audit: AuditView; onExport: () => void }) => (
   <>
     <SectionTitle title="Audit ledger" subtitle="Hash-chained, signed record of everything the agent did." />
@@ -615,6 +645,7 @@ export const GovernanceConsole = ({
   const [policy, setPolicy] = useState<readonly PolicyDecisionView[]>([]);
   const [cards, setCards] = useState<readonly VirtualCardView[]>([]);
   const [vault, setVault] = useState<readonly VaultEntryView[]>([]);
+  const [walletAccounts, setWalletAccounts] = useState<readonly ServiceAccountView[]>([]);
   const [audit, setAudit] = useState<AuditView | null>(null);
   const [identity, setIdentity] = useState<IdentityView | null>(null);
   const [activity, setActivity] = useState<ActivityResponse | null>(null);
@@ -628,12 +659,13 @@ export const GovernanceConsole = ({
 
   const refresh = useCallback(async () => {
     try {
-      const [ov, md, pol, cd, vt, au, id, act] = await Promise.all([
+      const [ov, md, pol, cd, vt, wl, au, id, act] = await Promise.all([
         api.getOverview(),
         api.getMandates(),
         api.getPolicy(policyFilter),
         api.getCards(),
         api.getVault(),
+        api.getWallet(),
         api.getAudit(),
         api.getIdentity(),
         api.getActivity(),
@@ -643,6 +675,7 @@ export const GovernanceConsole = ({
       setPolicy(pol);
       setCards(cd);
       setVault(vt);
+      setWalletAccounts(wl);
       setAudit(au);
       setIdentity(id);
       setActivity(act);
@@ -761,6 +794,7 @@ export const GovernanceConsole = ({
         <HardLimitsView cards={cards} statement={overview.statements.issuerEnforcedCaps} busy={busy} onSetCap={setCap} />
       )}
       {section === "vault" && overview !== null && <VaultView entries={vault} statement={overview.statements.vaultNeverReachesAgent} />}
+      {section === "wallet" && <WalletView accounts={walletAccounts} />}
       {section === "audit" && audit !== null && <AuditViewPanel audit={audit} onExport={exportAudit} />}
       {section === "identity" && identity !== null && overview !== null && (
         <IdentityViewPanel identity={identity} statement={overview.statements.operatorTrustAnchor} />
