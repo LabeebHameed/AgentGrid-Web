@@ -3,7 +3,6 @@ import {
   ShieldCheck,
   Inbox,
   History as HistoryIcon,
-  Bot,
   ShieldQuestion,
   LayoutDashboard,
   Landmark,
@@ -60,7 +59,6 @@ const demo = (import.meta.env.VITE_AGENTGRID_DEMO as string | undefined) === "1"
 const api: ApprovalApi = demo
   ? new SeedApi()
   : new HttpApi(apiBase);
-const AGENT = "did:key:z6MkvS1cqyiGLD6vMgccHakJ1GZK9mfkQnjbxZdxTyW8X23b";
 
 const EmptyInbox = () => (
   <div className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border py-20 text-center" style={{ borderColor: "var(--line)" }}>
