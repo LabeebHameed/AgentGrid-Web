@@ -60,6 +60,7 @@ const KillSwitch = ({
   onDelete: () => void;
 }) => {
   const [confirming, setConfirming] = useState(false);
+  const [deletingConfirm, setDeletingConfirm] = useState(false);
   const [reason, setReason] = useState("");
   const frozen = agent.status.frozen;
 
@@ -161,6 +162,26 @@ const KillSwitch = ({
               </button>
             </div>
           </div>
+        ) : deletingConfirm ? (
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                onDelete();
+                setDeletingConfirm(false);
+              }}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50 cursor-pointer"
+              style={{ background: "var(--danger)" }}
+            >
+              Confirm delete
+            </button>
+            <button
+              onClick={() => setDeletingConfirm(false)}
+              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium text-[var(--muted)] cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <button
@@ -172,7 +193,7 @@ const KillSwitch = ({
               Freeze agent
             </button>
             <button
-              onClick={onDelete}
+              onClick={() => setDeletingConfirm(true)}
               disabled={busy}
               className="inline-flex items-center gap-2 rounded-[var(--radius-md)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-50 cursor-pointer"
               style={{ background: "var(--danger)" }}
