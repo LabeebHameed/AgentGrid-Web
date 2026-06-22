@@ -344,14 +344,24 @@ export class HttpApi implements ApprovalApi {
   // ─── Governance ───────────────────────────────────────────────────────────
   #token: string | null = null;
   #agentDid: string | null = null;
+  // Deduplicates concurrent calls — 8 simultaneous #govGet calls on mount
+  // would otherwise fire 8 concurrent listAgents requests.
+  #agentDidPromise: Promise<string> | null = null;
 
   async #ensureAgentDid(): Promise<string> {
     if (this.#agentDid !== null) return this.#agentDid;
-    const agents = await this.listAgents();
-    const did = agents[0]?.did;
-    if (did === undefined) throw new Error("no agent to govern");
-    this.#agentDid = did;
-    return did;
+    if (this.#agentDidPromise !== null) return this.#agentDidPromise;
+    this.#agentDidPromise = this.listAgents()
+      .then((agents) => {
+        const did = agents[0]?.did;
+        if (did === undefined) throw new Error("no agent to govern");
+        this.#agentDid = did;
+        return did;
+      })
+      .finally(() => {
+        this.#agentDidPromise = null;
+      });
+    return this.#agentDidPromise;
   }
 
   async #ensureToken(): Promise<string> {
