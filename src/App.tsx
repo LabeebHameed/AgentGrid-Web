@@ -248,6 +248,9 @@ export default function App({ getClerkToken }: AppProps = {}) {
           const redirectUrl = `http://localhost:${cliPort}/callback?token=${encodeURIComponent(token)}`;
           window.location.href = redirectUrl;
         } catch (err) {
+          // Always clear the key on failure — leaving it causes repeated redirect
+          // attempts on every page load once the backend eventually responds.
+          sessionStorage.removeItem("agentgrid_login_cli_port");
           console.error("Failed to issue token for CLI login:", err);
         }
       })();
