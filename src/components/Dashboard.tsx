@@ -3,14 +3,12 @@ import {
   Activity as ActivityIcon,
   Bot,
   CheckCircle2,
-  KeyRound,
   Octagon,
   Play,
   ShieldAlert,
   ShieldCheck,
-  Wallet,
 } from "lucide-react";
-import type { ActivityEntry, AgentSummary, ServiceAccountView, VaultEntryView } from "../types";
+import type { ActivityEntry, AgentSummary } from "../types";
 import { shortDid, formatClock } from "../lib/format";
 import { CapabilityGlyph } from "./ui";
 
@@ -249,105 +247,9 @@ const ActivityFeed = ({ entries }: { entries: readonly ActivityEntry[] }) => {
   );
 };
 
-const statusColor = (status: ServiceAccountView["status"]): string => {
-  if (status === "active") return "var(--ok)";
-  if (status === "pending") return "var(--warn)";
-  return "var(--muted)";
-};
-
-const WalletSection = ({ accounts }: { accounts: readonly ServiceAccountView[] }) => (
-  <section>
-    <div className="mb-5 flex items-center gap-2">
-      <Wallet className="h-5 w-5 text-[var(--muted)]" strokeWidth={1.75} aria-hidden />
-      <h2 className="text-lg font-semibold tracking-tight text-[var(--text)]">Wallet</h2>
-      <span className="ml-auto text-xs text-[var(--subtle)]">Sites &amp; logins saved by the agent</span>
-    </div>
-    {accounts.length === 0 ? (
-      <div
-        className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border py-12 text-center"
-        style={{ borderColor: "var(--line)" }}
-      >
-        <Wallet className="h-6 w-6 text-[var(--subtle)]" aria-hidden />
-        <p className="mt-2 text-sm text-[var(--subtle)]">No saved accounts yet. The agent will add entries here when it signs up or logs in.</p>
-      </div>
-    ) : (
-      <div className="flex flex-col gap-1.5">
-        {accounts.map((acc) => (
-          <div
-            key={acc.service}
-            className="flex items-center gap-4 rounded-[var(--radius-md)] border px-4 py-3"
-            style={{ background: "var(--surface)", borderColor: "var(--line)" }}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="mono truncate text-sm font-medium text-[var(--text)]">{acc.service}</p>
-              <p className="truncate text-xs text-[var(--subtle)]">{acc.loginEmail}</p>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="text-xs text-[var(--subtle)]">{acc.ownership === "agent-owned" ? "agent-owned" : "user-provided"}</span>
-              <span
-                className="inline-flex items-center rounded-[var(--radius-full)] px-2 py-0.5 text-[11px] font-semibold"
-                style={{ color: statusColor(acc.status), background: "var(--surface-2)" }}
-              >
-                {acc.status}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </section>
-);
-
-const VaultSection = ({ entries }: { entries: readonly VaultEntryView[] }) => (
-  <section>
-    <div className="mb-5 flex items-center gap-2">
-      <KeyRound className="h-5 w-5 text-[var(--muted)]" strokeWidth={1.75} aria-hidden />
-      <h2 className="text-lg font-semibold tracking-tight text-[var(--text)]">Vault</h2>
-      <span className="ml-auto text-xs text-[var(--subtle)]">Secrets injected at runtime — values never shown</span>
-    </div>
-    {entries.length === 0 ? (
-      <div
-        className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border py-12 text-center"
-        style={{ borderColor: "var(--line)" }}
-      >
-        <KeyRound className="h-6 w-6 text-[var(--subtle)]" aria-hidden />
-        <p className="mt-2 text-sm text-[var(--subtle)]">No vault entries. Secrets stored here are injected at runtime and never returned to the agent.</p>
-      </div>
-    ) : (
-      <div className="flex flex-col gap-1.5">
-        {entries.map((entry) => (
-          <div
-            key={entry.handle}
-            className="flex items-center gap-4 rounded-[var(--radius-md)] border px-4 py-3"
-            style={{ background: "var(--surface)", borderColor: "var(--line)" }}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="mono truncate text-sm font-medium text-[var(--text)]">{entry.namespace}</p>
-              <p className="mono truncate text-xs text-[var(--subtle)]">{entry.handle}</p>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <span
-                className="inline-flex items-center rounded-[var(--radius-full)] px-2 py-0.5 text-[11px] font-semibold text-[var(--muted)]"
-                style={{ background: "var(--surface-2)" }}
-              >
-                {entry.trustDomain}
-              </span>
-              {entry.lastUsedAt !== null && (
-                <span className="text-xs text-[var(--subtle)]">{formatClock(entry.lastUsedAt)}</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </section>
-);
-
 export const Dashboard = ({
   agents,
   activity,
-  wallet,
-  vault,
   selectedAgentDid,
   busy,
   onFreeze,
@@ -356,8 +258,6 @@ export const Dashboard = ({
 }: {
   agents: readonly AgentSummary[];
   activity: readonly ActivityEntry[];
-  wallet: readonly ServiceAccountView[];
-  vault: readonly VaultEntryView[];
   selectedAgentDid: string | null;
   busy: boolean;
   onFreeze: (params: { agentDid: string; reason: string }) => void;
@@ -396,8 +296,5 @@ export const Dashboard = ({
       </div>
       <ActivityFeed entries={filteredActivity} />
     </section>
-
-    <WalletSection accounts={wallet} />
-    <VaultSection entries={vault} />
   </div>
 );};
