@@ -152,6 +152,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
   const [agents, setAgents] = useState<readonly AgentSummary[]>([]);
   const [activity, setActivity] = useState<readonly ActivityEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
   const [view, setView] = useState<View>("governance");
   const [busy, setBusy] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
@@ -180,6 +181,14 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setActivity(ac);
       setConnectionError(null);
       setDataLoaded(true);
+      // Set selected agent DID if not already set
+      if (selectedAgentDid === null && ag.length > 0) {
+        const firstAgentDid = ag[0]!.did;
+        setSelectedAgentDid(firstAgentDid);
+        if (api instanceof HttpApi) {
+          api.setAgentDid(firstAgentDid);
+        }
+      }
       // Auto-dismiss onboarding once we know agents exist — prevents the screen
       // from toggling back to OnboardingFlow if a poll briefly returns []
       if (ag.length > 0) {
@@ -191,7 +200,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setConnectionError("Backend connection failed — retrying. Check that the relay is reachable.");
       setDataLoaded(true);
     }
-  }, []);
+  }, [selectedAgentDid]);
 
   // Periodically check license status for the unlicensed-state banner (task 4.8)
   const refreshLicense = useCallback(async () => {
@@ -336,19 +345,39 @@ export default function App({ getClerkToken }: AppProps = {}) {
           <NavButton active={view === "settings"} onClick={() => setView("settings")} label="Settings" icon={<SettingsIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
         </nav>
 
-        <div className="mt-auto flex items-center gap-3 rounded-[var(--radius-md)] border px-3 py-3" style={{ borderColor: "var(--line)" }}>
-          {clerkMode ? (
-            <UserButton showName afterSignOutUrl="/" />
-          ) : (
-            <>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-full)]" style={{ background: "var(--surface-3)" }}>
-                <Bot className="h-4 w-4 text-[var(--muted)]" strokeWidth={1.75} aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-medium text-[var(--text)]">Agent Grid Agent</p>
-                <p className="mono truncate text-[11px] text-[var(--subtle)]">{shortDid(AGENT)}</p>
-              </div>
-            </>
+        <div className="mt-auto space-y-3">
+          {clerkMode && (
+            <div className="flex items-center gap-3 rounded-[var(--radius-md)] border px-3 py-3" style={{ borderColor: "var(--line)" }}>
+              <UserButton afterSignOutUrl="/" />
+            </div>
+          )}
+          {agents.length > 0 && (
+            <div style={{ borderColor: "var(--line)" }} className="rounded-[var(--radius-md)] border px-3 py-3">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-2">Agent</label>
+              <select
+                value={selectedAgentDid || ""}
+                onChange={(e) => {
+                  const did = e.target.value;
+                  setSelectedAgentDid(did);
+                  if (api instanceof HttpApi) {
+                    api.setAgentDid(did);
+                  }
+                  void refresh();
+                }}
+                className="w-full rounded-[var(--radius-sm)] border px-2 py-1.5 text-sm cursor-pointer"
+                style={{
+                  borderColor: "var(--line)",
+                  background: "var(--surface-2)",
+                  color: "var(--text)",
+                }}
+              >
+                {agents.map((agent) => (
+                  <option key={agent.did} value={agent.did}>
+                    {agent.displayName} ({shortDid(agent.did)})
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
       </aside>

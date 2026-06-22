@@ -344,24 +344,9 @@ export class HttpApi implements ApprovalApi {
   // ─── Governance ───────────────────────────────────────────────────────────
   #token: string | null = null;
   #agentDid: string | null = null;
-  // Deduplicates concurrent calls — 8 simultaneous #govGet calls on mount
-  // would otherwise fire 8 concurrent listAgents requests.
-  #agentDidPromise: Promise<string> | null = null;
 
-  async #ensureAgentDid(): Promise<string> {
-    if (this.#agentDid !== null) return this.#agentDid;
-    if (this.#agentDidPromise !== null) return this.#agentDidPromise;
-    this.#agentDidPromise = this.listAgents()
-      .then((agents) => {
-        const did = agents[0]?.did;
-        if (did === undefined) throw new Error("no agent to govern");
-        this.#agentDid = did;
-        return did;
-      })
-      .finally(() => {
-        this.#agentDidPromise = null;
-      });
-    return this.#agentDidPromise;
+  setAgentDid(did: string): void {
+    this.#agentDid = did;
   }
 
   async #ensureToken(): Promise<string> {
@@ -374,7 +359,8 @@ export class HttpApi implements ApprovalApi {
   }
 
   async #govGet<T>(suffix: string): Promise<T> {
-    const did = await this.#ensureAgentDid();
+    const did = this.#agentDid;
+    if (did === null) throw new Error("no agent selected");
     if (this.#getClerkToken) {
       const headers = await this.#getHeaders();
       const res = await fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
@@ -397,7 +383,8 @@ export class HttpApi implements ApprovalApi {
   }
 
   async #govPost<T>(suffix: string, body: unknown): Promise<{ status: number; data: T }> {
-    const did = await this.#ensureAgentDid();
+    const did = this.#agentDid;
+    if (did === null) throw new Error("no agent selected");
     if (this.#getClerkToken) {
       const headers = await this.#getHeaders({ "Content-Type": "application/json" });
       const res = await fetch(`${this.#base}/api/governance/${encodeURIComponent(did)}/${suffix}`, {
