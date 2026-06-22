@@ -165,8 +165,8 @@ const KillSwitch = ({
         ) : deletingConfirm ? (
           <div className="flex gap-2">
             <button
-              onClick={() => {
-                onDelete();
+              onClick={async () => {
+                await onDelete();
                 setDeletingConfirm(false);
               }}
               disabled={busy}

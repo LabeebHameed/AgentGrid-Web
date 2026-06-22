@@ -230,9 +230,14 @@ export default function App({ getClerkToken }: AppProps = {}) {
     async (params: { agentDid: string }) => {
       setBusy(true);
       try {
+        console.log("Deleting agent:", params.agentDid);
         await api.deleteAgent(params);
+        console.log("Agent deleted successfully");
         setSelectedAgentDid(null);
         await refresh();
+      } catch (err) {
+        console.error("Failed to delete agent:", err);
+        setConnectionError(`Failed to delete agent: ${err instanceof Error ? err.message : String(err)}`);
       } finally { setBusy(false); }
     },
     [refresh],
