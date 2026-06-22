@@ -51,11 +51,13 @@ const KillSwitch = ({
   busy,
   onFreeze,
   onUnfreeze,
+  onDelete,
 }: {
   agent: AgentSummary;
   busy: boolean;
   onFreeze: (reason: string) => void;
   onUnfreeze: () => void;
+  onDelete: () => void;
 }) => {
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");
@@ -160,14 +162,24 @@ const KillSwitch = ({
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setConfirming(true)}
-            className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
-            style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
-          >
-            <Octagon className="h-4 w-4" strokeWidth={2} aria-hidden />
-            Freeze agent
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirming(true)}
+              className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
+              style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
+            >
+              <Octagon className="h-4 w-4" strokeWidth={2} aria-hidden />
+              Freeze agent
+            </button>
+            <button
+              onClick={onDelete}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-[var(--radius-md)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-50 cursor-pointer"
+              style={{ background: "var(--danger)" }}
+            >
+              Delete
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -221,6 +233,7 @@ export const Dashboard = ({
   busy,
   onFreeze,
   onUnfreeze,
+  onDelete,
 }: {
   agents: readonly AgentSummary[];
   activity: readonly ActivityEntry[];
@@ -228,6 +241,7 @@ export const Dashboard = ({
   busy: boolean;
   onFreeze: (params: { agentDid: string; reason: string }) => void;
   onUnfreeze: (params: { agentDid: string }) => void;
+  onDelete: (params: { agentDid: string }) => void;
 }) => {
   const filteredActivity = selectedAgentDid
     ? activity.filter((entry) => entry.agentDid === selectedAgentDid)
@@ -248,6 +262,7 @@ export const Dashboard = ({
             busy={busy}
             onFreeze={(reason) => onFreeze({ agentDid: agent.did, reason })}
             onUnfreeze={() => onUnfreeze({ agentDid: agent.did })}
+            onDelete={() => onDelete({ agentDid: agent.did })}
           />
         ))}
       </div>
