@@ -228,9 +228,7 @@ export const Dashboard = ({
   busy: boolean;
   onFreeze: (params: { agentDid: string; reason: string }) => void;
   onUnfreeze: (params: { agentDid: string }) => void;
-}) => {
-  const selectedAgent = agents.find((a) => a.did === selectedAgentDid);
-  return (
+}) => (
   <div className="flex flex-col gap-8">
     <section>
       <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text)]">Agents</h1>
@@ -258,4 +256,4 @@ export const Dashboard = ({
       <ActivityFeed entries={activity} />
     </section>
   </div>
-);};
+);
