@@ -67,6 +67,8 @@ export interface ApprovalApi {
   freeze(params: { agentDid: string; reason: string }): Promise<void>;
   /** Lift the freeze: let the agent resume acting within its mandate. */
   unfreeze(params: { agentDid: string }): Promise<void>;
+  /** Delete an agent entirely from the tenant. */
+  deleteAgent(params: { agentDid: string }): Promise<void>;
 
   // ─── Governance read model (operator-authenticated) ───────────────────────
   getOverview(): Promise<GovernanceOverview>;
@@ -147,6 +149,10 @@ export class SeedApi implements ApprovalApi {
     this.#agents = this.#agents.map((a) =>
       a.did === params.agentDid ? { ...a, status: { frozen: false, reason: null, since: null } } : a,
     );
+  }
+
+  async deleteAgent(params: { agentDid: string }): Promise<void> {
+    this.#agents = this.#agents.filter((a) => a.did !== params.agentDid);
   }
 
   #mandates: MandateView[] = seedMandates();
@@ -339,6 +345,15 @@ export class HttpApi implements ApprovalApi {
       headers,
     });
     if (!res.ok) throw new Error(`unfreeze failed: ${res.status}`);
+  }
+
+  async deleteAgent(params: { agentDid: string }): Promise<void> {
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/agents/${encodeURIComponent(params.agentDid)}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (!res.ok) throw new Error(`delete agent failed: ${res.status}`);
   }
 
   // ─── Governance ───────────────────────────────────────────────────────────

@@ -352,29 +352,56 @@ export default function App({ getClerkToken }: AppProps = {}) {
           {agents.length > 0 && (
             <div style={{ borderColor: "var(--line)" }} className="rounded-[var(--radius-md)] border px-3 py-3">
               <label className="block text-xs font-medium text-[var(--muted)] mb-2">Agent</label>
-              <select
-                value={selectedAgentDid || ""}
-                onChange={(e) => {
-                  const did = e.target.value;
-                  setSelectedAgentDid(did);
-                  if (api instanceof HttpApi) {
-                    api.setAgentDid(did);
-                  }
-                  void refresh();
-                }}
-                className="w-full rounded-[var(--radius-sm)] border px-2 py-1.5 text-sm cursor-pointer"
-                style={{
-                  borderColor: "var(--line)",
-                  background: "var(--surface-2)",
-                  color: "var(--text)",
-                }}
-              >
-                {agents.map((agent) => (
-                  <option key={agent.did} value={agent.did}>
-                    {agent.displayName} ({shortDid(agent.did)})
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={selectedAgentDid || ""}
+                  onChange={(e) => {
+                    const did = e.target.value;
+                    setSelectedAgentDid(did);
+                    if (api instanceof HttpApi) {
+                      api.setAgentDid(did);
+                    }
+                    void refresh();
+                  }}
+                  className="flex-1 rounded-[var(--radius-sm)] border px-2 py-1.5 text-sm cursor-pointer"
+                  style={{
+                    borderColor: "var(--line)",
+                    background: "var(--surface-2)",
+                    color: "var(--text)",
+                  }}
+                >
+                  {agents.map((agent) => (
+                    <option key={agent.did} value={agent.did}>
+                      {agent.displayName} ({shortDid(agent.did)})
+                    </option>
+                  ))}
+                </select>
+                {selectedAgentDid && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        setBusy(true);
+                        await api.deleteAgent({ agentDid: selectedAgentDid });
+                        await refresh();
+                      } catch (err) {
+                        console.error("Failed to delete agent:", err);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    disabled={busy}
+                    className="shrink-0 rounded-[var(--radius-sm)] px-2 py-1.5 text-sm font-medium cursor-pointer transition-colors"
+                    style={{
+                      background: "var(--danger)",
+                      color: "var(--bg)",
+                      opacity: busy ? 0.5 : 1,
+                    }}
+                    title="Delete this agent"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -431,7 +458,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
             ) : view === "governance" ? (
               <GovernanceConsole api={api} agents={agents} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
             ) : view === "dashboard" ? (
-              <Dashboard agents={agents} activity={activity} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
+              <Dashboard agents={agents} activity={activity} selectedAgentDid={selectedAgentDid} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
             ) : view === "providers" ? (
               <ProvidersScreen api={api} />
             ) : view === "devices" ? (
