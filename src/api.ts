@@ -18,6 +18,7 @@ import type {
   PolicyDecisionView,
   ProvidersView,
   ResolvedApproval,
+  ServiceAccountView,
   Verdict,
   VaultEntryView,
   VirtualCardView,
@@ -76,6 +77,7 @@ export interface ApprovalApi {
   getPolicy(filter?: PolicyFilter): Promise<readonly PolicyDecisionView[]>;
   getCards(): Promise<readonly VirtualCardView[]>;
   getVault(): Promise<readonly VaultEntryView[]>;
+  getWallet(): Promise<readonly ServiceAccountView[]>;
   getAudit(): Promise<AuditView>;
   exportAudit(): Promise<AuditExport>;
   getIdentity(): Promise<IdentityView>;
@@ -177,6 +179,9 @@ export class SeedApi implements ApprovalApi {
   }
   async getVault(): Promise<readonly VaultEntryView[]> {
     return seedVault();
+  }
+  async getWallet(): Promise<readonly ServiceAccountView[]> {
+    return [];
   }
   async getAudit(): Promise<AuditView> {
     return seedAudit();
@@ -441,6 +446,9 @@ export class HttpApi implements ApprovalApi {
   }
   async getVault(): Promise<readonly VaultEntryView[]> {
     return this.#govGet<readonly VaultEntryView[]>("vault");
+  }
+  async getWallet(): Promise<readonly ServiceAccountView[]> {
+    return this.#govGet<readonly ServiceAccountView[]>("wallet");
   }
   async getAudit(): Promise<AuditView> {
     return this.#govGet<AuditView>("audit");

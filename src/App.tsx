@@ -12,7 +12,7 @@ import {
   KeyRound,
 } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
-import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval } from "./types";
+import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval, ServiceAccountView, VaultEntryView } from "./types";
 import { SignedIn, SignedOut, SignIn, UserButton, useAuth } from "@clerk/clerk-react";
 import { shortDid } from "./lib/format";
 import { useMediaQuery, useNow } from "./lib/useMediaQuery";
@@ -149,6 +149,8 @@ export default function App({ getClerkToken }: AppProps = {}) {
   const [history, setHistory] = useState<readonly ResolvedApproval[]>([]);
   const [agents, setAgents] = useState<readonly AgentSummary[]>([]);
   const [activity, setActivity] = useState<readonly ActivityEntry[]>([]);
+  const [wallet, setWallet] = useState<readonly ServiceAccountView[]>([]);
+  const [vault, setVault] = useState<readonly VaultEntryView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
   const [view, setView] = useState<View>("governance");
@@ -177,6 +179,12 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setHistory(h);
       setAgents(ag);
       setActivity(ac);
+      // Wallet and vault are agent-scoped; fetch only when an agent is selected.
+      // Errors are non-fatal — the sections will just show empty.
+      if (selectedAgentDid !== null) {
+        void api.getWallet().then(setWallet).catch(() => {});
+        void api.getVault().then(setVault).catch(() => {});
+      }
       setConnectionError(null);
       setDataLoaded(true);
       // Set selected agent DID if not already set
@@ -448,7 +456,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
             ) : view === "governance" ? (
               <GovernanceConsole api={api} agents={agents} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
             ) : view === "dashboard" ? (
-              <Dashboard agents={agents} activity={activity} selectedAgentDid={selectedAgentDid} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} onDelete={deleteAgent} />
+              <Dashboard agents={agents} activity={activity} wallet={wallet} vault={vault} selectedAgentDid={selectedAgentDid} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} onDelete={deleteAgent} />
             ) : view === "providers" ? (
               <ProvidersScreen api={api} />
             ) : view === "devices" ? (

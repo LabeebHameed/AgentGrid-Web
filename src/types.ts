@@ -165,6 +165,22 @@ export interface VaultEntryView {
   readonly grantingMandateId: string | null;
 }
 
+export type AccountOwnership = "agent-owned" | "user-provided";
+export type AccountStatus = "active" | "pending" | "disabled";
+
+export interface ServiceAccountView {
+  readonly service: string;
+  readonly ownership: AccountOwnership;
+  readonly loginEmail: string;
+  readonly passwordHandle: string | null;
+  readonly tokenHandle: string | null;
+  readonly accountId: string | null;
+  readonly accountUrl: string | null;
+  readonly linkedServices: readonly string[];
+  readonly status: AccountStatus;
+  readonly createdAt: string;
+}
+
 export interface AuditEntryView {
   readonly seq: number;
   readonly eventType: AuditEventType | string;
