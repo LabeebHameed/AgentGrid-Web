@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Check, X, Clock, ChevronLeft } from "lucide-react";
 import { riskOf, type ApprovalDecision, type ApprovalRequest } from "../types";
 import { formatAmount, formatClock, formatCountdown, headline, msUntil, shortDid } from "../lib/format";
@@ -84,18 +84,139 @@ const DecisionBar = ({
   );
 };
 
+const VncViewport = ({ requestId, apiBase }: { requestId: string; apiBase: string }) => {
+  const [frame, setFrame] = useState<string | null>(null);
+  const [status, setStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    let wsUrl: string;
+    try {
+      const base = apiBase || window.location.origin;
+      const url = new URL(base.startsWith("http") ? base : `${window.location.protocol}//${base}`);
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      url.pathname = "/api/captcha/ws";
+      url.searchParams.set("role", "console");
+      url.searchParams.set("requestId", requestId);
+      wsUrl = url.toString();
+    } catch {
+      const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      wsUrl = `${proto}//${window.location.host}/api/captcha/ws?role=console&requestId=${requestId}`;
+    }
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setStatus("connected");
+      ws.send(JSON.stringify({ type: "refresh" }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "frame" && msg.image) {
+          setFrame(`data:image/jpeg;base64,${msg.image}`);
+        }
+      } catch (err) {
+        console.error("VNC message error:", err);
+      }
+    };
+
+    ws.onclose = () => {
+      setStatus("disconnected");
+    };
+
+    ws.onerror = () => {
+      setStatus("disconnected");
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [requestId, apiBase]);
+
+  const handleClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!wsRef.current || status !== "connected") return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const naturalWidth = e.currentTarget.naturalWidth || 1024;
+    const naturalHeight = e.currentTarget.naturalHeight || 768;
+
+    const scaleX = naturalWidth / rect.width;
+    const scaleY = naturalHeight / rect.height;
+
+    const clickX = Math.round(x * scaleX);
+    const clickY = Math.round(y * scaleY);
+
+    wsRef.current.send(JSON.stringify({
+      type: "click",
+      x: clickX,
+      y: clickY,
+    }));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLImageElement>) => {
+    if (!wsRef.current || status !== "connected") return;
+    e.preventDefault();
+    wsRef.current.send(JSON.stringify({
+      type: "keypress",
+      key: e.key,
+    }));
+  };
+
+  return (
+    <div className="mt-6 flex flex-col gap-3 rounded-[var(--radius-md)] border p-4 bg-[#0a0a0c]" style={{ borderColor: "var(--line)" }}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--subtle)]">Live Remote Solve Viewport</span>
+        <span className="flex items-center gap-1.5 text-xs">
+          <span className="h-2 w-2 rounded-full" style={{ background: status === "connected" ? "var(--ok)" : status === "connecting" ? "var(--warn)" : "var(--danger)" }} />
+          <span style={{ color: status === "connected" ? "var(--ok)" : "var(--muted)" }}>
+            {status === "connected" ? "VNC Connected" : status === "connecting" ? "Connecting..." : "Disconnected"}
+          </span>
+        </span>
+      </div>
+
+      <div 
+        className="relative flex items-center justify-center overflow-hidden border rounded bg-[#16161a] select-none cursor-crosshair"
+        style={{ borderColor: "var(--line)", minHeight: "300px" }}
+      >
+        {frame ? (
+          <img 
+            src={frame} 
+            alt="Browser viewport"
+            onClick={handleClick}
+            onKeyDown={handleKeyPress}
+            tabIndex={0}
+            className="max-w-full max-h-[500px] object-contain outline-none"
+          />
+        ) : (
+          <p className="text-sm text-[var(--subtle)]">Waiting for browser frames...</p>
+        )}
+      </div>
+      <p className="text-xs text-[var(--muted)] text-center">
+        Click directly on the checkbox or images inside the viewport to solve the CAPTCHA remotely.
+      </p>
+    </div>
+  );
+};
+
 export const ApprovalCard = ({
   request,
   nowMs,
   busy,
   onDecide,
   onBack,
+  apiBase,
 }: {
   request: ApprovalRequest;
   nowMs: number;
   busy: boolean;
   onDecide: (decision: ApprovalDecision, reason: string) => void;
   onBack?: () => void;
+  apiBase?: string;
 }) => {
   const tier = riskOf(request);
   const spine = tier === "high" ? "var(--danger)" : "var(--warn)";
@@ -183,6 +304,17 @@ export const ApprovalCard = ({
             <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--subtle)]">Agent's rationale</p>
             <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">“{request.rationale}”</p>
           </div>
+
+          {/* VNC Live Viewport for CAPTCHA Solve */}
+          {request.action === "captcha_solve" && (
+            <VncViewport 
+              requestId={request.id} 
+              apiBase={apiBase || (() => {
+                if (typeof window === "undefined") return "";
+                return localStorage.getItem("agentgrid_api_base") || "";
+              })()} 
+            />
+          )}
 
           <div className="perforation my-7" />
 

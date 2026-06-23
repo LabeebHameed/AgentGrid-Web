@@ -479,7 +479,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
                     </div>
                     <div className="min-w-0">
                       {selected ? (
-                        <ApprovalCard request={selected} nowMs={nowMs} busy={busy} onDecide={decide} />
+                        <ApprovalCard request={selected} nowMs={nowMs} busy={busy} onDecide={decide} apiBase={apiBase} />
                       ) : (
                         <div className="flex h-full min-h-64 flex-col items-center justify-center rounded-[var(--radius-lg)] border text-center" style={{ borderColor: "var(--line)" }}>
                           <ShieldQuestion className="h-6 w-6 text-[var(--subtle)]" aria-hidden />
@@ -489,7 +489,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
                     </div>
                   </div>
                 ) : mobileShowCard && selected ? (
-                  <ApprovalCard request={selected} nowMs={nowMs} busy={busy} onDecide={decide} onBack={() => setSelectedId(null)} />
+                  <ApprovalCard request={selected} nowMs={nowMs} busy={busy} onDecide={decide} onBack={() => setSelectedId(null)} apiBase={apiBase} />
                 ) : (
                   <InboxList requests={pending} selectedId={selectedId} nowMs={nowMs} onSelect={setSelectedId} />
                 )}
