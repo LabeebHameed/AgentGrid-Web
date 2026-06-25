@@ -478,6 +478,80 @@ const VaultView = ({ entries, statement }: { entries: readonly VaultEntryView[];
     )}
   </>
 );
+const WalletAccountCard = ({ acc }: { acc: ServiceAccountView }) => {
+  const [flipped, setFlipped] = useState(false);
+  const hasPassword = acc.passwordHandle !== null;
+
+  return (
+    <div
+      style={{ perspective: "1000px" }}
+      className="h-[62px] w-full"
+    >
+      <div
+        onClick={() => {
+          if (hasPassword) {
+            setFlipped(!flipped);
+          }
+        }}
+        style={{
+          transformStyle: "preserve-3d",
+          transition: "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+          transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          cursor: hasPassword ? "pointer" : "default",
+        }}
+        className="relative w-full h-full"
+      >
+        {/* Front side */}
+        <div
+          style={{
+            backfaceVisibility: "hidden",
+            borderColor: "var(--line)",
+          }}
+          className="absolute inset-0 flex items-center justify-between rounded-[var(--radius-md)] border px-3.5 py-2.5 bg-[var(--surface)] transition-colors hover:bg-[var(--surface-2)]"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[var(--text)]">{acc.service}</p>
+            <p className="truncate text-xs text-[var(--subtle)]">{acc.loginEmail}</p>
+          </div>
+          <div className="shrink-0 flex items-center gap-3 text-right text-xs text-[var(--muted)]">
+            <div>
+              <p>{acc.ownership === "agent-owned" ? "agent-owned" : "user-provided"}</p>
+              <p
+                className="text-[var(--subtle)]"
+                style={{ color: acc.status === "active" ? "var(--ok)" : acc.status === "pending" ? "var(--warn)" : "var(--muted)" }}
+              >
+                {acc.status}
+              </p>
+            </div>
+            {hasPassword && (
+              <KeyRound className="h-4 w-4 text-[var(--subtle)] opacity-60" />
+            )}
+          </div>
+        </div>
+
+        {/* Back side */}
+        <div
+          style={{
+            backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+            borderColor: "var(--line-strong)",
+          }}
+          className="absolute inset-0 flex items-center justify-between rounded-[var(--radius-md)] border px-3.5 py-2.5 bg-[var(--surface-3)]"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--subtle)]">Password Handle</p>
+            <p className="mono truncate text-sm text-[var(--ok)]">{acc.passwordHandle}</p>
+          </div>
+          <div className="shrink-0 text-right text-xs text-[var(--muted)] flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-black/40 border border-white/5 mono">
+              ••••••••
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const WalletView = ({ accounts }: { accounts: readonly ServiceAccountView[] }) => (
   <>
@@ -487,19 +561,7 @@ const WalletView = ({ accounts }: { accounts: readonly ServiceAccountView[] }) =
     ) : (
       <div className="flex flex-col gap-2">
         {accounts.map((acc) => (
-          <div key={acc.service} className="flex items-center justify-between rounded-[var(--radius-md)] border px-3.5 py-2.5" style={{ borderColor: "var(--line)" }}>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--text)]">{acc.service}</p>
-              <p className="truncate text-xs text-[var(--subtle)]">{acc.loginEmail}</p>
-            </div>
-            <div className="shrink-0 text-right text-xs text-[var(--muted)]">
-              <p>{acc.ownership === "agent-owned" ? "agent-owned" : "user-provided"}</p>
-              <p className="text-[var(--subtle)]"
-                style={{ color: acc.status === "active" ? "var(--ok)" : acc.status === "pending" ? "var(--warn)" : "var(--muted)" }}>
-                {acc.status}
-              </p>
-            </div>
-          </div>
+          <WalletAccountCard key={acc.service} acc={acc} />
         ))}
       </div>
     )}
