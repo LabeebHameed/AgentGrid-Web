@@ -27,6 +27,7 @@ import { ProvidersScreen } from "./components/Providers";
 import { DevicesScreen } from "./components/Devices";
 import { CreateAgent } from "./components/CreateAgent";
 import { OnboardingFlow } from "./components/Wizard";
+import { McpConnectFlow } from "./components/McpConnectFlow";
 
 type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices" | "create-agent";
 
@@ -140,6 +141,25 @@ export default function App({ getClerkToken }: AppProps = {}) {
   // ClerkAppContent). Demo/seed mode passes no getter, so the Clerk-only UI
   // (sign-out UserButton) stays hidden and never renders outside ClerkProvider.
   const clerkMode = getClerkToken !== undefined;
+
+  // ── MCP callback detection ────────────────────────────────────────────────
+  // The MCP binary opens the console with ?callbackUrl=http://localhost:8989/callback.
+  // Clerk's sign-in flow clears search params on redirect, so we persist the
+  // callbackUrl in sessionStorage immediately so it survives the auth round-trip.
+  const [callbackUrl] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get("callbackUrl");
+    if (fromUrl) {
+      sessionStorage.setItem("agentgrid_callback_url", fromUrl);
+      // Clean it from the URL bar so it doesn't persist after login
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("callbackUrl");
+      window.history.replaceState({}, "", clean.toString());
+      return fromUrl;
+    }
+    return sessionStorage.getItem("agentgrid_callback_url");
+  });
 
   useEffect(() => {
     if (getClerkToken && api instanceof HttpApi) {
@@ -340,6 +360,18 @@ export default function App({ getClerkToken }: AppProps = {}) {
           onDone={dismissOnboarding}
         />
       </div>
+    );
+  }
+
+  // Show the MCP connect flow when a callbackUrl is present and we've loaded
+  // enough data to know the agent list (even if it's empty — user can create one).
+  if (callbackUrl && dataLoaded && clerkMode) {
+    return (
+      <McpConnectFlow
+        api={api}
+        agents={agents}
+        callbackUrl={callbackUrl}
+      />
     );
   }
 
