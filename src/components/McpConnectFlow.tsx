@@ -9,7 +9,7 @@ import {
   ChevronRight,
   Bot,
 } from "lucide-react";
-import type { ApprovalApi } from "../api";
+import type { ApprovalApi, MandateSpecInput } from "../api";
 import type { AgentSummary } from "../types";
 import { shortDid } from "../lib/format";
 
@@ -23,6 +23,76 @@ interface MandateForm {
     allowedDomains?: string[];
   };
 }
+
+/**
+ * Translate the simplified mandate checklist into full `MandateSpecInput`s the
+ * relay enrolls with. Each capability's scope is filled out to a valid
+ * `MandateScope` (mirroring the server's defaults) so the operator only ever
+ * toggles + sets thresholds/limits in the UI.
+ */
+const buildMandateSpecs = (forms: readonly MandateForm[]): MandateSpecInput[] =>
+  forms
+    .filter((m) => m.enabled)
+    .map((m): MandateSpecInput => {
+      const stepUp = m.stepUpThresholdMinor;
+      switch (m.capability) {
+        case "pay":
+          return {
+            capability: "pay",
+            stepUpThresholdMinor: stepUp,
+            scope: {
+              capability: "pay",
+              currency: "USD",
+              limitPerTransactionMinor: m.scope.limitPerTransactionMinor ?? 2000,
+              limitPerPeriodMinor: m.scope.limitPerTransactionMinor ?? 2000,
+              periodDays: 30,
+              allowedCategories: ["saas", "compute", "data"],
+              allowedMerchants: ["*"],
+              deniedMerchants: [],
+            },
+          };
+        case "browse":
+          return {
+            capability: "browse",
+            stepUpThresholdMinor: stepUp,
+            scope: {
+              capability: "browse",
+              allowedDomains: (m.scope.allowedDomains?.length ?? 0) > 0 ? m.scope.allowedDomains : ["*"],
+              deniedDomains: [],
+              maxSessionMinutes: 60,
+            },
+          };
+        case "comms":
+          return {
+            capability: "comms",
+            stepUpThresholdMinor: stepUp,
+            scope: {
+              capability: "comms",
+              maySendEmail: true,
+              maySendSms: true,
+              allowedRecipientDomains: ["*"],
+            },
+          };
+        case "deploy":
+          return {
+            capability: "deploy",
+            stepUpThresholdMinor: stepUp,
+            scope: {
+              capability: "deploy",
+              providers: ["agentgrid-cloud"],
+              monthlyBudgetMinor: 10000,
+              allowedRegions: (m.scope.allowedRegions?.length ?? 0) > 0 ? m.scope.allowedRegions : ["iad1", "sfo1"],
+              mayPurchaseDomains: false,
+            },
+          };
+        default:
+          return {
+            capability: m.capability as MandateSpecInput["capability"],
+            stepUpThresholdMinor: stepUp,
+            scope: { capability: m.capability },
+          };
+      }
+    });
 
 interface McpConnectFlowProps {
   readonly api: ApprovalApi;
@@ -268,14 +338,23 @@ function CreateAgentForm({
     setLoading(true);
     setError(null);
     try {
-      const result = await api.createAgent({ displayName: trimmed });
+      const mandateSpecs = buildMandateSpecs(mandates);
+      const result = await api.createAgent({ displayName: trimmed, mandateSpecs });
       setResultToken(result.token);
       setDone(true);
 
-      // Fire the callback with the real token + agent name
+      // Fire the callback with the real token + agent name + the chosen mandate
+      // specs (base64url JSON) so the local MCP enrolls under exactly these
+      // mandates — not the relay's defaults.
       const url = new URL(callbackUrl);
       url.searchParams.set("token", result.token);
       url.searchParams.set("agentName", trimmed);
+      if (mandateSpecs.length > 0) {
+        url.searchParams.set(
+          "mandates",
+          btoa(JSON.stringify(mandateSpecs)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+        );
+      }
       // Small delay so user sees the success state flash
       await new Promise((r) => setTimeout(r, 600));
       window.location.href = url.toString();

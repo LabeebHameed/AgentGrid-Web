@@ -45,6 +45,17 @@ export interface PolicyFilter {
   readonly capability?: Capability;
 }
 
+/**
+ * A mandate spec the console sends when creating an agent — the capability, its
+ * scope, and the step-up threshold. Mirrors the server's `MandateSpec`/`MandateScope`
+ * union loosely (the relay validates/enforces the full shape on enroll).
+ */
+export interface MandateSpecInput {
+  readonly capability: Capability;
+  readonly scope: Record<string, unknown>;
+  readonly stepUpThresholdMinor: number | null;
+}
+
 /** Outcome of a set-cap control request (R4.5–R4.7). */
 export type SetCardLimitsResult =
   | { readonly ok: true }
@@ -103,7 +114,11 @@ export interface ApprovalApi {
   /** Mint a connection token bound to the signed-in tenant (onboarding). */
   issueAgentToken(): Promise<{ token: string }>;
   /** Create a new agent pre-registered with the server. */
-  createAgent(params: { displayName: string }): Promise<{ token: string; displayName: string }>;
+  createAgent(params: {
+    displayName: string;
+    /** Optional mandate specs to enroll the new agent with (capability + scope + step-up). */
+    mandateSpecs?: readonly MandateSpecInput[];
+  }): Promise<{ token: string; displayName: string }>;
   /** Provider connection status for the Providers screen (task 4.4). */
   getProviders(): Promise<ProvidersView>;
   /** Linked phone devices for the Devices screen (task 4.5). */
@@ -270,7 +285,7 @@ export class SeedApi implements ApprovalApi {
   async issueAgentToken(): Promise<{ token: string }> {
     return { token: "ag_demo_token_xxxxxxxxxxxxxxxxxxxx" };
   }
-  async createAgent(params: { displayName: string }): Promise<{ token: string; displayName: string }> {
+  async createAgent(params: { displayName: string; mandateSpecs?: readonly MandateSpecInput[] }): Promise<{ token: string; displayName: string }> {
     const rawToken = "ag_demo_token_" + Math.random().toString(36).substring(2);
     // Add to seed agents list so it shows up in UI
     const did = `did:key:z6Mkg` + Math.random().toString(36).substring(2, 10);
@@ -575,12 +590,17 @@ export class HttpApi implements ApprovalApi {
     if (!res.ok) throw new Error(`token issue failed: ${res.status}`);
     return (await res.json()) as { token: string };
   }
-  async createAgent(params: { displayName: string }): Promise<{ token: string; displayName: string }> {
+  async createAgent(params: { displayName: string; mandateSpecs?: readonly MandateSpecInput[] }): Promise<{ token: string; displayName: string }> {
     const headers = await this.#getHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`${this.#base}/api/agents`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ displayName: params.displayName }),
+      body: JSON.stringify({
+        displayName: params.displayName,
+        ...(params.mandateSpecs !== undefined && params.mandateSpecs.length > 0
+          ? { mandateSpecs: params.mandateSpecs }
+          : {}),
+      }),
     });
     if (!res.ok) throw new Error(`create agent failed: ${res.status}`);
     return (await res.json()) as { token: string; displayName: string };
