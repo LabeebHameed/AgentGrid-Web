@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Shield, Key, Check, Copy, User, HelpCircle, ArrowRight } from "lucide-react";
+import { Shield, Check, Copy, User, ArrowRight } from "lucide-react";
 
 interface MandateForm {
   capability: string;
@@ -15,7 +15,7 @@ interface MandateForm {
 export const CreateAgent = ({ onDone }: { onDone?: () => void }) => {
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
-  const [token, setToken] = useState("");
+  const [, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
