@@ -10,6 +10,7 @@ import {
   Plug,
   Smartphone,
   KeyRound,
+  UserPlus,
 } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
 import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval } from "./types";
@@ -24,9 +25,10 @@ import { GovernanceConsole } from "./components/Governance";
 import { Settings } from "./components/Settings";
 import { ProvidersScreen } from "./components/Providers";
 import { DevicesScreen } from "./components/Devices";
+import { CreateAgent } from "./components/CreateAgent";
 import { OnboardingFlow } from "./components/Wizard";
 
-type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices";
+type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices" | "create-agent";
 
 const resolveApiBase = (): string => {
   if (typeof window === "undefined") return "";
@@ -167,11 +169,12 @@ export default function App({ getClerkToken }: AppProps = {}) {
 
   const refresh = useCallback(async () => {
     try {
-      const [p, h, ag, ac] = await Promise.all([
+      const [p, h, ag, ac, activeDid] = await Promise.all([
         api.listPending(),
         api.listHistory(),
         api.listAgents(),
         api.listActivity(),
+        api.getActiveAgent().catch(() => null),
       ]);
       setPending(p);
       setHistory(h);
@@ -181,10 +184,11 @@ export default function App({ getClerkToken }: AppProps = {}) {
       setDataLoaded(true);
       // Set selected agent DID if not already set
       if (selectedAgentDid === null && ag.length > 0) {
-        const firstAgentDid = ag[0]!.did;
-        setSelectedAgentDid(firstAgentDid);
+        const matchingAgent = ag.find((a) => a.did === activeDid) ?? ag[0]!;
+        const resolvedDid = matchingAgent.did;
+        setSelectedAgentDid(resolvedDid);
         if (api instanceof HttpApi) {
-          api.setAgentDid(firstAgentDid);
+          api.setAgentDid(resolvedDid);
         }
       }
       // Auto-dismiss onboarding once we know agents exist — prevents the screen
@@ -270,7 +274,14 @@ export default function App({ getClerkToken }: AppProps = {}) {
           const { token } = await api.issueAgentToken();
           sessionStorage.removeItem("agentgrid_login_cli_port");
           sessionStorage.removeItem("agentgrid_login_cli_port_ts");
-          const redirectUrl = `http://localhost:${cliPort}/callback?token=${encodeURIComponent(token)}`;
+          // Agent-wise login: if the operator named the agent to connect (via the
+          // Create Agent screen), carry that name so the CLI provisions/selects it.
+          const pendingName = sessionStorage.getItem("agentgrid_pending_agent_name");
+          sessionStorage.removeItem("agentgrid_pending_agent_name");
+          const nameQuery = pendingName && pendingName.trim() !== ""
+            ? `&agentName=${encodeURIComponent(pendingName.trim())}`
+            : "";
+          const redirectUrl = `http://localhost:${cliPort}/callback?token=${encodeURIComponent(token)}${nameQuery}`;
           window.location.href = redirectUrl;
         } catch (err) {
           sessionStorage.removeItem("agentgrid_login_cli_port");
@@ -357,6 +368,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
           </div>
           <NavButton active={view === "providers"} onClick={() => setView("providers")} label="Providers" icon={<Plug className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "devices"} onClick={() => setView("devices")} label="Devices" icon={<Smartphone className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
+          <NavButton active={view === "create-agent"} onClick={() => setView("create-agent")} label="New agent" icon={<UserPlus className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "settings"} onClick={() => setView("settings")} label="Settings" icon={<SettingsIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
         </nav>
 
@@ -377,7 +389,9 @@ export default function App({ getClerkToken }: AppProps = {}) {
                   if (api instanceof HttpApi) {
                     api.setAgentDid(did);
                   }
-                  void refresh();
+                  void api.setActiveAgent(did)
+                    .catch((err) => console.error("Failed to set active agent:", err))
+                    .then(() => refresh());
                 }}
                 className="w-full rounded-[var(--radius-sm)] border px-2 py-1.5 text-sm cursor-pointer"
                 style={{
@@ -445,6 +459,8 @@ export default function App({ getClerkToken }: AppProps = {}) {
 
             {view === "settings" ? (
               <Settings api={api} />
+            ) : view === "create-agent" ? (
+              <CreateAgent onDone={() => undefined} />
             ) : view === "governance" ? (
               <GovernanceConsole api={api} agents={agents} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />
             ) : view === "dashboard" ? (

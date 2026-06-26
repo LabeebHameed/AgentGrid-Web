@@ -98,8 +98,12 @@ export interface ApprovalApi {
   activateLicense(params: { key: string }): Promise<{ ok: boolean; reason?: string }>;
   deactivateLicense(): Promise<{ ok: boolean }>;
   getConnect(): Promise<ConnectSnippet>;
+  getActiveAgent(): Promise<string | null>;
+  setActiveAgent(did: string): Promise<void>;
   /** Mint a connection token bound to the signed-in tenant (onboarding). */
   issueAgentToken(): Promise<{ token: string }>;
+  /** Create a new agent pre-registered with the server. */
+  createAgent(params: { displayName: string }): Promise<{ token: string; displayName: string }>;
   /** Provider connection status for the Providers screen (task 4.4). */
   getProviders(): Promise<ProvidersView>;
   /** Linked phone devices for the Devices screen (task 4.5). */
@@ -112,6 +116,7 @@ export class SeedApi implements ApprovalApi {
   #pending: ApprovalRequest[] = seedPending();
   #history: ResolvedApproval[] = seedHistory();
   #agents: AgentSummary[] = seedAgents();
+  #activeDid: string | null = null;
 
   async listPending(): Promise<readonly ApprovalRequest[]> {
     return [...this.#pending];
@@ -256,8 +261,30 @@ export class SeedApi implements ApprovalApi {
   async getConnect(): Promise<ConnectSnippet> {
     return { snippet: { mcpServers: { agentgrid: { command: "agent-grid-mcp" } } } };
   }
+  async getActiveAgent(): Promise<string | null> {
+    return this.#activeDid ?? (this.#agents[0]?.did ?? null);
+  }
+  async setActiveAgent(did: string): Promise<void> {
+    this.#activeDid = did;
+  }
   async issueAgentToken(): Promise<{ token: string }> {
     return { token: "ag_demo_token_xxxxxxxxxxxxxxxxxxxx" };
+  }
+  async createAgent(params: { displayName: string }): Promise<{ token: string; displayName: string }> {
+    const rawToken = "ag_demo_token_" + Math.random().toString(36).substring(2);
+    // Add to seed agents list so it shows up in UI
+    const did = `did:key:z6Mkg` + Math.random().toString(36).substring(2, 10);
+    this.#agents = [
+      ...this.#agents,
+      {
+        did,
+        displayName: params.displayName,
+        capabilities: ["pay", "browse", "comms", "deploy"],
+        status: { frozen: false, reason: null, since: null }
+      }
+    ];
+    this.#activeDid = did;
+    return { token: rawToken, displayName: params.displayName };
   }
   async getProviders(): Promise<ProvidersView> {
     return {
@@ -521,6 +548,23 @@ export class HttpApi implements ApprovalApi {
     if (!res.ok) throw new Error(`connect fetch failed: ${res.status}`);
     return (await res.json()) as ConnectSnippet;
   }
+  async getActiveAgent(): Promise<string | null> {
+    const headers = await this.#getHeaders();
+    const res = await fetch(`${this.#base}/api/agents/active`, { headers });
+    if (!res.ok) throw new Error(`get active agent failed: ${res.status}`);
+    const data = (await res.json()) as { activeDid: string | null };
+    return data.activeDid;
+  }
+  async setActiveAgent(did: string): Promise<void> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
+    const res = await fetch(`${this.#base}/api/agents/active`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ agentDid: did }),
+    });
+    if (!res.ok) throw new Error(`set active agent failed: ${res.status}`);
+    this.#agentDid = did;
+  }
   async issueAgentToken(): Promise<{ token: string }> {
     const headers = await this.#getHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`${this.#base}/api/tokens`, {
@@ -530,6 +574,16 @@ export class HttpApi implements ApprovalApi {
     });
     if (!res.ok) throw new Error(`token issue failed: ${res.status}`);
     return (await res.json()) as { token: string };
+  }
+  async createAgent(params: { displayName: string }): Promise<{ token: string; displayName: string }> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
+    const res = await fetch(`${this.#base}/api/agents`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ displayName: params.displayName }),
+    });
+    if (!res.ok) throw new Error(`create agent failed: ${res.status}`);
+    return (await res.json()) as { token: string; displayName: string };
   }
   async getProviders(): Promise<ProvidersView> {
     const headers = await this.#getHeaders();
