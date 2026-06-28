@@ -202,6 +202,14 @@ function ExistingAgentPicker({
   return (
     <div className="space-y-4">
       <div
+        className="rounded-[var(--radius-sm)] border px-4 py-3 text-xs text-[var(--muted)] leading-relaxed"
+        style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}
+      >
+        <strong className="text-[var(--text)]">Heads up:</strong> if you originally enrolled this agent with
+        a recovery passphrase, your terminal will prompt for it after you click Connect. It can&apos;t recover
+        the key on this device without the passphrase you set at enrollment time.
+      </div>
+      <div
         className="rounded-[var(--radius-md)] border p-5"
         style={{ borderColor: "var(--line)", background: "var(--surface-1)" }}
       >
@@ -277,6 +285,9 @@ function CreateAgentForm({
   callbackUrl: string;
 }) {
   const [name, setName] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [passphraseConfirm, setPassphraseConfirm] = useState("");
+  const [showPassphrase, setShowPassphrase] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -311,7 +322,11 @@ function CreateAgentForm({
   ]);
 
   const trimmed = name.trim();
-  const valid = trimmed.length > 0;
+  // Passphrase is optional — but if the operator starts typing one, both
+  // fields must agree. Empty passphrase falls back to the MCP's local prompt.
+  const passphraseTouched = passphrase.length > 0 || passphraseConfirm.length > 0;
+  const passphraseValid = !passphraseTouched || passphrase === passphraseConfirm;
+  const valid = trimmed.length > 0 && passphraseValid;
 
   const toggleMandate = (index: number) => {
     setMandates((prev) =>
@@ -353,6 +368,20 @@ function CreateAgentForm({
         url.searchParams.set(
           "mandates",
           btoa(JSON.stringify(mandateSpecs)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+        );
+      }
+      // Pass the recovery passphrase if the operator provided one. The MCP
+      // uses it to encrypt the new agent's private key into a cloud backup
+      // so a fresh device can later recover the key by re-typing it. Empty
+      // passphrase → MCP prompts locally instead. Base64url so any bytes
+      // (including unicode) survive the URL round-trip unchanged.
+      if (passphrase.length > 0) {
+        url.searchParams.set(
+          "passphrase",
+          btoa(unescape(encodeURIComponent(passphrase)))
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, ""),
         );
       }
       // Small delay so user sees the success state flash
@@ -442,6 +471,7 @@ function CreateAgentForm({
       </div>
 
       {/* Mandates */}
+      {/* Recovery passphrase (Step 2) */}
       <div
         className="rounded-[var(--radius-md)] border p-5"
         style={{ borderColor: "var(--line)", background: "var(--surface-1)" }}
@@ -449,6 +479,76 @@ function CreateAgentForm({
         <div className="flex items-center gap-2 mb-4">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-400">
             2
+          </span>
+          <h2 className="text-sm font-semibold text-[var(--text)] uppercase tracking-wider">
+            Recovery passphrase <span className="text-[var(--muted)] normal-case font-normal">(optional)</span>
+          </h2>
+        </div>
+        <p className="text-xs text-[var(--muted)] mb-3 leading-relaxed">
+          Set a passphrase to encrypt this agent&apos;s private key for cross-device recovery. The cloud never sees
+          it — encryption happens locally in your terminal — but you&apos;ll need to re-type it on any new device
+          that binds to this agent. Leave blank to have your terminal prompt you instead.
+        </p>
+        <label htmlFor="agent-passphrase-mcp" className="block text-xs font-medium text-[var(--muted)] mb-2">
+          Passphrase
+        </label>
+        <div className="relative">
+          <input
+            id="agent-passphrase-mcp"
+            type={showPassphrase ? "text" : "password"}
+            value={passphrase}
+            onChange={(e) => setPassphrase(e.target.value)}
+            placeholder="e.g. correct horse battery staple"
+            autoComplete="new-password"
+            className="w-full rounded-[var(--radius-sm)] border px-3 py-2 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all font-mono"
+            style={{ borderColor: "var(--line)", background: "var(--surface-2)", color: "var(--text)" }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassphrase((v) => !v)}
+            className="absolute right-2 top-1.5 px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
+            aria-label={showPassphrase ? "Hide passphrase" : "Show passphrase"}
+          >
+            {showPassphrase ? "Hide" : "Show"}
+          </button>
+        </div>
+        <label htmlFor="agent-passphrase-confirm-mcp" className="block text-xs font-medium text-[var(--muted)] mt-3 mb-2">
+          Confirm passphrase
+        </label>
+        <div className="relative">
+          <input
+            id="agent-passphrase-confirm-mcp"
+            type={showPassphrase ? "text" : "password"}
+            value={passphraseConfirm}
+            onChange={(e) => setPassphraseConfirm(e.target.value)}
+            placeholder="re-type the same passphrase"
+            autoComplete="new-password"
+            className="w-full rounded-[var(--radius-sm)] border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all font-mono"
+            style={{
+              borderColor: passphraseValid ? "var(--line)" : "rgb(239 68 68)",
+              background: "var(--surface-2)",
+              color: "var(--text)",
+            }}
+          />
+        </div>
+        {passphraseTouched && !passphraseValid && (
+          <p className="text-xs text-red-400 mt-2">Passphrases don&apos;t match.</p>
+        )}
+        {passphrase.length > 0 && (
+          <p className="text-[10px] text-[var(--muted)] mt-2 leading-relaxed">
+            Forgetting this passphrase is unrecoverable on a new device. Pick something memorable — or note it
+            in your password manager.
+          </p>
+        )}
+      </div>
+
+      <div
+        className="rounded-[var(--radius-md)] border p-5"
+        style={{ borderColor: "var(--line)", background: "var(--surface-1)" }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-400">
+            3
           </span>
           <h2 className="text-sm font-semibold text-[var(--text)] uppercase tracking-wider">
             Mandates &amp; Thresholds
