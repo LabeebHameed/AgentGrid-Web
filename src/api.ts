@@ -113,6 +113,13 @@ export interface ApprovalApi {
   setActiveAgent(did: string): Promise<void>;
   /** Mint a connection token bound to the signed-in tenant (onboarding). */
   issueAgentToken(): Promise<{ token: string }>;
+  /**
+   * Mint a recovery-scoped connection token for an existing agent. The console
+   * calls this when the operator picks "use existing agent" so the local MCP
+   * can authenticate the GET /api/agents/:did/key-backup call with a fresh
+   * ag_… token scoped to that agent's owning tenant.
+   */
+  issueRecoveryToken(params: { agentDid: string }): Promise<{ token: string }>;
   /** Create a new agent pre-registered with the server. */
   createAgent(params: {
     displayName: string;
@@ -284,6 +291,14 @@ export class SeedApi implements ApprovalApi {
   }
   async issueAgentToken(): Promise<{ token: string }> {
     return { token: "ag_demo_token_xxxxxxxxxxxxxxxxxxxx" };
+  }
+  async issueRecoveryToken(_params: { agentDid: string }): Promise<{ token: string }> {
+    // Seed mode never actually recovers a real key — but we hand back a
+    // deterministic demo token so the picker can still spin up the bind
+    // flow visually. The local MCP will fail its token-authenticated step
+    // (because this token doesn't exist in the cloud), and the user will
+    // see a clear "demo mode" error instead of crashing the UI.
+    return { token: "ag_demo_token_recovery_xxxxxxxxxxxxx" };
   }
   async createAgent(params: { displayName: string; mandateSpecs?: readonly MandateSpecInput[] }): Promise<{ token: string; displayName: string }> {
     const rawToken = "ag_demo_token_" + Math.random().toString(36).substring(2);
@@ -589,6 +604,16 @@ export class HttpApi implements ApprovalApi {
     });
     if (!res.ok) throw new Error(`token issue failed: ${res.status}`);
     return (await res.json()) as { token: string };
+  }
+  async issueRecoveryToken(params: { agentDid: string }): Promise<{ token: string }> {
+    const headers = await this.#getHeaders({ "Content-Type": "application/json" });
+    const res = await fetch(
+      `${this.#base}/api/agents/${encodeURIComponent(params.agentDid)}/recovery-token`,
+      { method: "POST", headers },
+    );
+    if (!res.ok) throw new Error(`recovery-token issue failed: ${res.status}`);
+    const body = (await res.json()) as { token: string };
+    return { token: body.token };
   }
   async createAgent(params: { displayName: string; mandateSpecs?: readonly MandateSpecInput[] }): Promise<{ token: string; displayName: string }> {
     const headers = await this.#getHeaders({ "Content-Type": "application/json" });

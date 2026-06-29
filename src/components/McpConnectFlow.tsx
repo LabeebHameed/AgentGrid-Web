@@ -176,27 +176,41 @@ function ExistingAgentPicker({
   onSelect,
   onBack,
   callbackUrl,
+  api,
 }: {
   agents: readonly AgentSummary[];
   onSelect: (agent: AgentSummary) => void;
   onBack: () => void;
   callbackUrl: string;
+  api: ApprovalApi;
 }) {
   const [picked, setPicked] = useState<string>(agents[0]?.did ?? "");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fire = async () => {
     const agent = agents.find((a) => a.did === picked);
     if (!agent) return;
     setLoading(true);
-    // Build the callback URL with agentId + agentName params
-    const url = new URL(callbackUrl);
-    url.searchParams.set("agentId", agent.did);
-    url.searchParams.set("agentName", agent.displayName);
-    // Give the browser a tick to show the loading state before navigating
-    await new Promise((r) => setTimeout(r, 80));
-    onSelect(agent);
-    window.location.href = url.toString();
+    setError(null);
+    try {
+      // Mint a recovery-scoped token scoped to this agent's tenant. The MCP
+      // uses it to authenticate the GET /key-backup call during the recovery
+      // bind flow. Operators without this token see "Missing connection token"
+      // — which is the exact failure we're resolving here.
+      const { token } = await api.issueRecoveryToken({ agentDid: agent.did });
+      const url = new URL(callbackUrl);
+      url.searchParams.set("agentId", agent.did);
+      url.searchParams.set("agentName", agent.displayName);
+      url.searchParams.set("token", token);
+      // Give the browser a tick to show the loading state before navigating
+      await new Promise((r) => setTimeout(r, 80));
+      onSelect(agent);
+      window.location.href = url.toString();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not issue recovery token");
+      setLoading(false);
+    }
   };
 
   return (
@@ -261,6 +275,16 @@ function ExistingAgentPicker({
         {loading ? "Connecting…" : "Connect this agent"}
         <ArrowRight className="h-4 w-4" />
       </button>
+
+      {error !== null && (
+        <p
+          role="alert"
+          className="text-xs text-red-400 mt-2 rounded-[var(--radius-sm)] border px-3 py-2 text-center"
+          style={{ borderColor: "rgba(239, 68, 68, 0.3)", background: "rgba(239, 68, 68, 0.08)" }}
+        >
+          Could not authenticate with the cloud: {error}
+        </p>
+      )}
 
       <button
         type="button"
@@ -721,6 +745,7 @@ export function McpConnectFlow({ api, agents, callbackUrl }: McpConnectFlowProps
               onSelect={() => undefined}
               onBack={() => setMode("choose")}
               callbackUrl={callbackUrl}
+              api={api}
             />
           )}
         </div>
