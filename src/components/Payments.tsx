@@ -27,6 +27,11 @@ interface CheckoutSetup {
   readonly checkoutUrl: string;
 }
 
+interface CardholderBalance {
+  readonly balanceCents: number;
+  readonly currency: "USD";
+}
+
 const POLL_INTERVAL_MS = 2_000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
 
@@ -71,6 +76,8 @@ export const Payments = () => {
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const [balance, setBalance] = useState<CardholderBalance | null>(null);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const pollStopRef = useRef<(() => void) | null>(null);
 
   // Initial load — fetch current status.
@@ -103,6 +110,23 @@ export const Payments = () => {
 
   useEffect(() => stopPolling, [stopPolling]);
 
+  const fetchBalance = useCallback(async (): Promise<void> => {
+    if (!tenantId) return;
+    setBalanceError(null);
+    try {
+      const b = await fetchJson<CardholderBalance>(
+        `/api/tenants/${encodeURIComponent(tenantId)}/cardholder/balance`,
+      );
+      setBalance(b);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // 503 = AgentCard not wired (dev mode); show a graceful message rather
+      // than an error. Other errors (network, 5xx) keep their message.
+      setBalance(null);
+      setBalanceError(msg === "disabled" ? null : msg);
+    }
+  }, [tenantId]);
+
   const startSetup = useCallback(async () => {
     if (!tenantId) return;
     setSetupError(null);
@@ -133,6 +157,7 @@ export const Payments = () => {
         if (s.ready) {
           setReady(true);
           setIframeUrl(null);
+          void fetchBalance();
           return;
         }
       } catch {
@@ -232,6 +257,22 @@ export const Payments = () => {
               ? "Your AI agent can spend up to its per-card cap. Click below to top up the cardholder balance."
               : "Attach a payment method to fund your AgentCard cardholder. Stripe Checkout will open — complete it in the iframe, then this page auto-refreshes."}
           </p>
+          {ready === true && balance !== null && (
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="mono text-2xl font-semibold text-[var(--text)]">
+                {new Intl.NumberFormat("en-US", { style: "currency", currency: balance.currency }).format(balance.balanceCents / 100)}
+              </span>
+              <span className="text-xs text-[var(--subtle)]">cardholder balance</span>
+            </div>
+          )}
+          {ready === true && balance === null && balanceError === null && (
+            <p className="mt-2 text-xs text-[var(--muted)]">Loading balance…</p>
+          )}
+          {ready === true && balanceError !== null && (
+            <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
+              Balance unavailable (AgentCard not configured in this environment).
+            </p>
+          )}
           {setupError !== null && (
             <p className="mt-2 text-xs" style={{ color: "var(--danger)" }}>
               Couldn't start checkout: {setupError}
