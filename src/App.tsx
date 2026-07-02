@@ -11,6 +11,7 @@ import {
   Smartphone,
   KeyRound,
   UserPlus,
+  CreditCard,
 } from "lucide-react";
 import { HttpApi, SeedApi, type ApprovalApi } from "./api";
 import type { ActivityEntry, AgentSummary, ApprovalDecision, ApprovalRequest, LicenseStatus, ResolvedApproval } from "./types";
@@ -28,8 +29,9 @@ import { DevicesScreen } from "./components/Devices";
 import { CreateAgent } from "./components/CreateAgent";
 import { OnboardingFlow } from "./components/Wizard";
 import { McpConnectFlow } from "./components/McpConnectFlow";
+import { Payments } from "./components/Payments";
 
-type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices" | "create-agent";
+type View = "governance" | "dashboard" | "inbox" | "history" | "settings" | "providers" | "devices" | "create-agent" | "payments";
 
 const resolveApiBase = (): string => {
   if (typeof window === "undefined") return "";
@@ -399,6 +401,7 @@ export default function App({ getClerkToken }: AppProps = {}) {
             <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--subtle)]">Setup</p>
           </div>
           <NavButton active={view === "providers"} onClick={() => setView("providers")} label="Providers" icon={<Plug className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
+          <NavButton active={view === "payments"} onClick={() => setView("payments")} label="Payments" icon={<CreditCard className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "devices"} onClick={() => setView("devices")} label="Devices" icon={<Smartphone className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "create-agent"} onClick={() => setView("create-agent")} label="New agent" icon={<UserPlus className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
           <NavButton active={view === "settings"} onClick={() => setView("settings")} label="Settings" icon={<SettingsIcon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />} />
@@ -506,6 +509,12 @@ export default function App({ getClerkToken }: AppProps = {}) {
                 <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text)]">Decision history</h1>
                 <p className="mb-6 text-sm text-[var(--muted)]">Every approval and denial, signed and recorded.</p>
                 <History items={history} />
+              </>
+            ) : view === "payments" ? (
+              <>
+                <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text)]">Payments</h1>
+                <p className="mb-6 text-sm text-[var(--muted)]">AgentCard cardholder funding — stopgap UI until the real design lands.</p>
+                <Payments />
               </>
             ) : (
               <>
