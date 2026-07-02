@@ -69,8 +69,17 @@ const fetchJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export const Payments = () => {
-  const tenantId = resolveTenantId();
+  const [tenantId, setTenantId] = useState<string>(() => resolveTenantId());
+  const [tenantIdInput, setTenantIdInput] = useState<string>("");
   const apiBase = resolveApiBase();
+
+  const saveTenantId = useCallback((value: string): void => {
+    const trimmed = value.trim();
+    if (trimmed === "") return;
+    localStorage.setItem("agentgrid_tenant_id", trimmed);
+    setTenantId(trimmed);
+    setTenantIdInput("");
+  }, []);
 
   const [ready, setReady] = useState<boolean | null>(null);
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
@@ -196,19 +205,53 @@ export const Payments = () => {
     );
   }
 
-  // No tenantId configured.
+  // No tenantId configured — show an inline input so the user can set it
+  // without URL-hacking or localStorage devtools. Saved value is remembered
+  // across sessions.
   if (!tenantId) {
     return (
       <div
-        className="flex items-start gap-3 rounded-[var(--radius-lg)] border px-4 py-4"
+        className="rounded-[var(--radius-lg)] border px-4 py-4"
         style={{ borderColor: "var(--line)" }}
       >
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--muted)" }} strokeWidth={1.75} aria-hidden />
-        <div>
-          <p className="text-sm font-semibold text-[var(--text)]">No tenant selected</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Add <code className="mono rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--surface-2)" }}>?tenantId=…</code> to the URL or set <code className="mono rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--surface-2)" }}>agentgrid_tenant_id</code> in localStorage.
-          </p>
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--muted)" }} strokeWidth={1.75} aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-[var(--text)]">No tenant selected</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Paste your tenant id (the{" "}
+              <code className="mono rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--surface-2)" }}>userId</code>{" "}
+              returned by <code className="mono rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--surface-2)" }}>POST /api/tenants</code> or your Clerk console) to view payments.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveTenantId(tenantIdInput);
+              }}
+              className="mt-3 flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={tenantIdInput}
+                onChange={(e) => setTenantIdInput(e.target.value)}
+                placeholder="tenant_abc123"
+                className="mono min-w-0 flex-1 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs outline-none focus:ring-1"
+                style={{
+                  background: "var(--surface-2)",
+                  borderColor: "var(--line)",
+                  color: "var(--text)",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={tenantIdInput.trim() === ""}
+                className="shrink-0 rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ background: "var(--text)", color: "var(--bg)" }}
+              >
+                Save
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     );
