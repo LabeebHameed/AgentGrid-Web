@@ -1,0 +1,8 @@
+/* TEAM */
+Chef / Architect: Vishnu
+Developer: Gemini Coding Assistant
+
+/* SITE */
+Last update: 2026-07-05
+Standards: HTML5, CSS3, React, TypeScript, TailwindCSS
+Components: Radix UI, Framer Motion

@@ -1,44 +1,45 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import { ClerkProvider } from "@clerk/clerk-react";
-import App, { ClerkAppWrapper } from "./App";
-import "./index.css";
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import { ClerkProvider } from '@clerk/clerk-react'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { clerkPublishableKey } from './lib/client'
+if (typeof navigator !== 'undefined' && navigator.userAgent.includes('HeadlessChrome')) {
+  Object.assign(window, { __TESTING__: true });
+}
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+import Router from './Router'
 
-// Must run before Clerk changes the URL during auth flow.
-// We stamp a timestamp alongside the port so we can expire stale keys —
-// a key without a timestamp is from an old code version and is always stale.
-const _cliPort = new URLSearchParams(window.location.search).get("login_cli_port");
-if (_cliPort) {
-  sessionStorage.setItem("agentgrid_login_cli_port", _cliPort);
-  sessionStorage.setItem("agentgrid_login_cli_port_ts", String(Date.now()));
-} else {
-  // Discard any key that has no timestamp (stuck from before the fix) or is
-  // older than 5 minutes — the Clerk auth redirect completes in seconds.
-  const _ts = sessionStorage.getItem("agentgrid_login_cli_port_ts");
-  if (!_ts || Date.now() - Number(_ts) > 5 * 60 * 1000) {
-    sessionStorage.removeItem("agentgrid_login_cli_port");
-    sessionStorage.removeItem("agentgrid_login_cli_port_ts");
+declare global {
+  interface Window {
+    __react_root__?: ReturnType<typeof createRoot>;
   }
 }
 
-const root = document.getElementById("root");
-if (root === null) throw new Error("missing #root");
+const container = document.getElementById('root')!;
+let root = window.__react_root__;
+if (!root) {
+  root = createRoot(container);
+  window.__react_root__ = root;
+}
 
-const renderApp = () => {
-  if (PUBLISHABLE_KEY) {
-    return (
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-        <ClerkAppWrapper />
-      </ClerkProvider>
-    );
-  }
-  return <App />;
-};
-
-createRoot(root).render(
+const app = (
   <StrictMode>
-    {renderApp()}
-  </StrictMode>,
-);
+    <ErrorBoundary>
+      <TooltipProvider delayDuration={120}>
+        <Router />
+      </TooltipProvider>
+    </ErrorBoundary>
+  </StrictMode>
+)
+
+root.render(
+  clerkPublishableKey !== undefined ? (
+    <ClerkProvider publishableKey={clerkPublishableKey}>
+      {app}
+    </ClerkProvider>
+  ) : (
+    app
+  ),
+)

@@ -1,0 +1,24 @@
+{
+  "name": "AgentTag — Identity for AI agents",
+  "short_name": "AgentTag",
+  "description": "The control plane that gives every autonomous agent its own credentials and audit trail, governed by signed mandates you control and can revoke in one step.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo_bgremoved.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

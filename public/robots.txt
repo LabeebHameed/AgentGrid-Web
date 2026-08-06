@@ -1,0 +1,59 @@
+# AgentTag — robots.txt
+# Hash-routed SPA; the homepage is prerendered to static HTML so crawlers and
+# AI answer engines get real content without executing JavaScript.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# --- AI / answer-engine crawlers: explicitly welcome (GEO / AEO) ---
+# Training + retrieval bots that power AI Overviews, ChatGPT, Claude, Perplexity,
+# Copilot and Apple Intelligence. We want to be citable, so all are allowed.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# --- Data-scraping and training bots: ALLOWED ---
+# For an open protocol/control-plane like AgentTag, being included in the 
+# foundational training weights of Claude, GPT, and Llama is highly desirable.
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# Structured guide for AI agents: https://agenttag.me/llms.txt
+
+Sitemap: https://agenttag.me/sitemap.xml
