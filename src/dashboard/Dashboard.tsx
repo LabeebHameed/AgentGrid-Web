@@ -640,11 +640,11 @@ function Shell() {
   }, []);
 
   return (
-    <div className="aeg-dash">
+    <div className="aeg-dash flex min-h-screen h-full w-full flex-col">
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <SidebarProvider className={cn("flex-1", "[--app-wrapper-max-width:80rem]", "[--app-header-height:3rem]")}>
+      <SidebarProvider className={cn("flex flex-1 min-h-0 h-full w-full", "[--app-wrapper-max-width:80rem]", "[--app-header-height:3rem]")}>
         <AgenttagSidebar route={route} nav={nav} onOpenWizard={() => setWizardOpen(true)} dark={dark} />
-        <SidebarInset className="min-h-0 bg-muted dark:bg-background">
+        <SidebarInset className="flex flex-1 flex-col min-h-0 h-full w-full bg-muted dark:bg-background">
           <AgenttagHeader
             route={route}
             nav={nav}
@@ -652,7 +652,7 @@ function Shell() {
             toggleTheme={toggleTheme}
             onOpenSearch={() => setSearchOpen(true)}
           />
-          <main id="main-content" className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <main id="main-content" className="relative flex min-h-0 flex-1 flex-col overflow-hidden w-full h-full">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={route}
@@ -660,7 +660,7 @@ function Shell() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={route === "dashboard" ? { opacity: 0, y: -8 } : { opacity: 1, y: 0 }}
                 transition={{ duration: route === "dashboard" ? 0.18 : 0, ease: "easeOut" }}
-                className="flex flex-1 flex-col overflow-hidden relative min-h-0 h-full"
+                className="flex flex-1 flex-col overflow-hidden relative min-h-0 h-full w-full"
               >
                 {loadingRoute ? (
                   <PageSkeleton route={route} />

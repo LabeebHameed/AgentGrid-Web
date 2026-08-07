@@ -38,7 +38,7 @@ export function AuditLedgerPage() {
     return ledger
       .filter((e) => {
         if (filter !== "all" && e.verdict !== filter) return false;
-        if (activeAgent && e.agent !== activeAgent.name) return false;
+        if (activeAgent && e.agent !== activeAgent.name && e.agent !== activeAgent.did && e.agent !== activeAgent.id && !activeAgent.did.includes(e.agent)) return false;
         if (!needle) return true;
         return (
           e.action.toLowerCase().includes(needle) ||
