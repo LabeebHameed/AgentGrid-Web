@@ -94,7 +94,6 @@ export function DecisionsDonut({ ledger }: { ledger: LedgerEntry[] }) {
       const v = e.verdict === "OK" ? "ALLOW" : e.verdict;
       if (v in base) base[v] += 1;
     }
-    base.ALLOW += 38; base.STEP_UP += 9; base.NOTICE += 14; base.DENY += 4;
     return VERDICT_META.map((m) => ({ name: m.label, value: base[m.key], fill: m.color }));
   }, [ledger]);
 
@@ -297,19 +296,25 @@ export function AuditLedgerPanel({
   );
 }
 
-export function LiveActivityPanel() {
-  const rows: { tone: "ok" | "info" | "warn" | "muted"; title: string; meta: string }[] = [
-    { tone: "ok",   title: "Chain integrity check passed",     meta: "system · just now" },
-    { tone: "info", title: "System posture recomputed",         meta: "system · 2 min ago" },
-    { tone: "ok",   title: "Passport rotation completed",      meta: "operator · 8 min ago" },
-    { tone: "warn", title: "SLA warning cleared on Ops",       meta: "Ops Agent · 12 min ago" },
-    { tone: "info", title: "Mandate signed (Stripe)",          meta: "operator · 1 hour ago" },
-    { tone: "warn", title: "Budget threshold warning",         meta: "Research Agent · 3 hours ago" },
-    { tone: "warn", title: "Suspicious tool execution blocked",meta: "Agenttag Enforcer · 5 hours ago" },
-    { tone: "ok",   title: "Biometric signature verified",     meta: "Finance Agent · 8 hours ago" },
-    { tone: "muted",title: "Provider connected (Stripe)",      meta: "system · 1 day ago" },
-    { tone: "muted",title: "Ledger snapshot archived",         meta: "system · 2 days ago" },
-  ];
+export function LiveActivityPanel({ ledger = [] }: { ledger?: LedgerEntry[] }) {
+  const rows = useMemo(() => {
+    return ledger.slice(-10).reverse().map((e) => {
+      const tone = e.verdict === "ALLOW" || e.verdict === "OK" ? "ok" : e.verdict === "DENY" ? "warn" : "info";
+      return {
+        tone: tone as "ok" | "info" | "warn" | "muted",
+        title: `${e.action} (${e.verdict})`,
+        meta: `${e.agent} · ${new Date(e.ts).toLocaleTimeString()}`,
+      };
+    });
+  }, [ledger]);
+
+  if (rows.length === 0) {
+    return (
+      <div className="py-6 text-center text-xs text-muted-foreground">
+        No live activity logged yet.
+      </div>
+    );
+  }
 
   return (
     <div className="ad-scroll-inner flex flex-col overflow-y-auto pr-1" style={{ maxHeight: 240 }}>

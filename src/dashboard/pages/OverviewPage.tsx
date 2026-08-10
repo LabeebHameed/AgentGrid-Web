@@ -19,7 +19,7 @@ export function OverviewPage({ onNav }: { onNav: (k: RouteKey) => void }) {
   const { agents, approvals, ledger, providers, settings, toast } = useStore();
   const spend = agents.reduce((s, a) => s + a.spendUsed, 0);
   const activeAgents = agents.filter((a) => a.status === "active").length;
-  const decisionsToday = ledger.length + 38;
+  const decisionsToday = ledger.length;
   const pendingCount = approvals.length;
 
   const [timeframe, setTimeframe] = useState("Last 30 days");
@@ -235,7 +235,7 @@ export function OverviewPage({ onNav }: { onNav: (k: RouteKey) => void }) {
               </div>
             </CardHeader>
             <CardContent className="flex-1 pt-0">
-              <LiveActivityPanel />
+              <LiveActivityPanel ledger={ledger} />
             </CardContent>
             <div className="px-6 pb-5">
               <Button
