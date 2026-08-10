@@ -423,10 +423,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         api.getDevices(),
       ]);
 
-      agentNamesRef.current = new Map(rawAgents.map((a) => [a.did, a.displayName]));
+      const safeAgents = Array.isArray(rawAgents) ? rawAgents : [];
+      const safePending = Array.isArray(pending) ? pending : [];
+      const safeActivity = Array.isArray(activity) ? activity : [];
+      const safeProviders = Array.isArray(providersView?.providers) ? providersView.providers : [];
+      const safeDevices = Array.isArray(devicesView?.devices) ? devicesView.devices : [];
+
+      agentNamesRef.current = new Map(safeAgents.map((a) => [a.did, a.displayName]));
 
       const pendingList = readPending().filter(
-        (p) => !rawAgents.some((a) => a.displayName === p.displayName),
+        (p) => !safeAgents.some((a) => a.displayName === p.displayName),
       );
       writePending(pendingList);
 
@@ -434,7 +440,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // #agentDid field is never read while a different agent's request is in
       // flight. Small consoles (tens of agents, not thousands) make this fine.
       const mapped: Agent[] = [];
-      for (const a of rawAgents) {
+      for (const a of safeAgents) {
         if (isHttpApi()) {
           setApiAgentDid(a.did);
         } else {
@@ -444,11 +450,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         let spendUsed = 0;
         let spendLimit = 0;
         try {
-          mandates = [...(await api.getMandates())];
+          const resMandates = await api.getMandates();
+          mandates = Array.isArray(resMandates) ? resMandates : [];
           const cards = await api.getCards();
-          for (const c of cards) {
-            spendUsed += c.periodSpentMinor / 100;
-            spendLimit += c.perPeriodMinor / 100;
+          if (Array.isArray(cards)) {
+            for (const c of cards) {
+              spendUsed += (c?.periodSpentMinor ?? 0) / 100;
+              spendLimit += (c?.perPeriodMinor ?? 0) / 100;
+            }
           }
         } catch {
           /* governance not reachable for this agent yet (e.g. mid-enrollment) */
@@ -485,23 +494,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
 
       setApprovals(
-        pending.map((r) => mapApproval(r, agentNamesRef.current.get(r.agent) ?? shortDid(r.agent))),
+        safePending.map((r) => mapApproval(r, agentNamesRef.current.get(r.agent) ?? shortDid(r.agent))),
       );
 
       const taskCounts = new Map<string, number>();
-      for (const e of activity) taskCounts.set(e.agentDid, (taskCounts.get(e.agentDid) ?? 0) + 1);
+      for (const e of safeActivity) taskCounts.set(e.agentDid, (taskCounts.get(e.agentDid) ?? 0) + 1);
       setAgents((cur) => cur.map((a) => ({ ...a, tasks: taskCounts.get(a.did) ?? a.tasks })));
 
       setLedger(
-        activity
+        safeActivity
           .map((e) => mapLedgerEntry(e, agentNamesRef.current.get(e.agentDid) ?? shortDid(e.agentDid)))
           .sort((a, b) => a.seq - b.seq)
           .slice(-200),
       );
 
-      setProviders(providersView.providers.map(mapProvider));
-      setDevices(devicesView.devices.map(mapDevice));
-      setEnrollQrPayload(devicesView.enrollQrPayload);
+      setProviders(safeProviders.map(mapProvider));
+      setDevices(safeDevices.map(mapDevice));
+      setEnrollQrPayload(devicesView?.enrollQrPayload ?? null);
     } catch (error) {
       toast(error instanceof Error ? error.message : "Failed to refresh from the server", "bad");
     } finally {

@@ -30,7 +30,7 @@ export function AuditLedgerPage() {
   const sparkData = useMemo(() => computeSparkline(ledger, now), [ledger, now]);
   const delta = useMemo(() => computeDelta(ledger, now), [ledger, now]);
   const verdictSegs = useMemo(() => computeVerdictSegments(ledger), [ledger]);
-  const heatmap = useMemo(() => computeHeatmap(ledger, 6, now), [ledger, now]);
+  const heatmap = useMemo(() => computeHeatmap(ledger, now, 6), [ledger, now]);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -83,11 +83,14 @@ export function AuditLedgerPage() {
   // Sparkline path builder
   const sparkMax = Math.max(...sparkData.map((p) => p.count), 1);
   const W = 160, H = 40;
-  const sparkPath = sparkData.map((p, i) => {
-    const x = (i / (sparkData.length - 1)) * W;
-    const y = H - (p.count / sparkMax) * H * 0.85 - 4;
-    return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-  }).join(" ");
+  const sparkPath = sparkData.length > 0
+    ? sparkData.map((p, i) => {
+        const denom = sparkData.length > 1 ? sparkData.length - 1 : 1;
+        const x = (i / denom) * W;
+        const y = H - (p.count / sparkMax) * H * 0.85 - 4;
+        return `${i === 0 ? "M" : "L"} ${Number.isFinite(x) ? x.toFixed(1) : "0"} ${Number.isFinite(y) ? y.toFixed(1) : "0"}`;
+      }).join(" ")
+    : `M 0 ${H} L ${W} ${H}`;
 
   const okCount = verdictSegs.find((s) => s.key === "ALLOW" || s.key === "OK")?.count ?? 0;
   const denyCount = verdictSegs.find((s) => s.key === "DENY")?.count ?? 0;

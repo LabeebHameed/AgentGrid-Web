@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getStored, setStored, removeStored } from "@/lib/storage";
 
 export type RouteKey =
@@ -662,39 +663,41 @@ function Shell() {
                 transition={{ duration: route === "dashboard" ? 0.18 : 0, ease: "easeOut" }}
                 className="flex flex-1 flex-col overflow-hidden relative min-h-0 h-full w-full"
               >
-                {loadingRoute ? (
-                  <PageSkeleton route={route} />
-                ) : (
-                  <>
-                    {route === "dashboard" && <OverviewPage onNav={nav} />}
-                    {route === "governance" && <GovernancePage />}
-                    {route === "inbox" && <InboxPage onNav={nav} />}
-                    {route === "audit" && <AuditLedgerPage />}
-                    {route === "history" && <HistoryPage />}
-                    {route === "vault" && <VaultPage />}
-                    {route === "wallet" && <WalletPage />}
-                    {route === "providers" && <ProvidersPage />}
-                    {route === "devices" && <DevicesPage />}
-                    {route === "settings" && (
-                      <SettingsSplitLayout activeSub={parseSettingsSubpath(hash) || "account"}>
-                        {(() => {
-                          const sub = parseSettingsSubpath(hash);
-                          if (sub === null || sub === "account") return <SettingsAccountPage />;
-                          if (sub === "security") return <SettingsPage onReopenWizard={() => setWizardOpen(true)} />;
-                          if (sub === "notifications") return <SettingsNotificationsPage />;
-                          if (sub === "audit") return <SettingsAuditPage />;
-                          return <SettingsAccountPage />;
-                        })()}
-                      </SettingsSplitLayout>
-                    )}
-                    {route === "support" && <SupportPage />}
-                    {route === "notifications" && <NotificationsPage onNav={nav} />}
-                    {route === "profile" && <ProfilePage />}
-                    {route === "help" && (
-                      <HelpPage onNav={nav} onOpenPalette={() => setSearchOpen(true)} />
-                    )}
-                  </>
-                )}
+                <ErrorBoundary key={route} fallbackTitle={`${ROUTE_LABEL[route] || "Page"} Error`}>
+                  {loadingRoute ? (
+                    <PageSkeleton route={route} />
+                  ) : (
+                    <>
+                      {route === "dashboard" && <OverviewPage onNav={nav} />}
+                      {route === "governance" && <GovernancePage />}
+                      {route === "inbox" && <InboxPage onNav={nav} />}
+                      {route === "audit" && <AuditLedgerPage />}
+                      {route === "history" && <HistoryPage />}
+                      {route === "vault" && <VaultPage />}
+                      {route === "wallet" && <WalletPage />}
+                      {route === "providers" && <ProvidersPage />}
+                      {route === "devices" && <DevicesPage />}
+                      {route === "settings" && (
+                        <SettingsSplitLayout activeSub={parseSettingsSubpath(hash) || "account"}>
+                          {(() => {
+                            const sub = parseSettingsSubpath(hash);
+                            if (sub === null || sub === "account") return <SettingsAccountPage />;
+                            if (sub === "security") return <SettingsPage onReopenWizard={() => setWizardOpen(true)} />;
+                            if (sub === "notifications") return <SettingsNotificationsPage />;
+                            if (sub === "audit") return <SettingsAuditPage />;
+                            return <SettingsAccountPage />;
+                          })()}
+                        </SettingsSplitLayout>
+                      )}
+                      {route === "support" && <SupportPage />}
+                      {route === "notifications" && <NotificationsPage onNav={nav} />}
+                      {route === "profile" && <ProfilePage />}
+                      {route === "help" && (
+                        <HelpPage onNav={nav} onOpenPalette={() => setSearchOpen(true)} />
+                      )}
+                    </>
+                  )}
+                </ErrorBoundary>
               </motion.div>
             </AnimatePresence>
           </main>

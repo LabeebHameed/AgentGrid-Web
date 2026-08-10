@@ -1,66 +1,56 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ReactNode, type ErrorInfo } from "react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-type Props = { children: ReactNode };
-type State = { error: Error | null };
+interface Props {
+  children: ReactNode;
+  fallbackTitle?: string;
+}
 
-// Without a boundary, any uncaught error during render unmounts the entire tree and
-// leaves a blank white page in production (dev hides this behind Vite's overlay).
-// This catches it and shows an actionable fallback instead of nothing.
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
+
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  public state: State = {
+    hasError: false,
+    error: null,
+  };
 
-  static getDerivedStateFromError(error: Error): State {
-    return { error };
+  public static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    // Surface the real cause in production consoles for debugging.
-    console.error("Uncaught render error:", error, info.componentStack);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Dashboard ErrorBoundary caught error:", error, errorInfo);
   }
 
-  render() {
-    if (this.state.error) {
+  private handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  public render() {
+    if (this.state.hasError) {
       return (
-        <div
-          role="alert"
-          style={{
-            minHeight: "100vh",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-            padding: 24,
-            textAlign: "center",
-            fontFamily: "Inter, system-ui, sans-serif",
-            color: "var(--ad-fg, #0a0a0a)",
-            background: "var(--ad-bg, #ffffff)",
-          }}
-        >
-          <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Something went wrong</h1>
-          <p style={{ fontSize: 14, opacity: 0.7, margin: 0, maxWidth: 420 }}>
-            The page failed to load. Reloading usually fixes it.
+        <div className="flex flex-col items-center justify-center p-8 m-6 rounded-2xl border border-destructive/20 bg-destructive/5 text-center min-h-[300px]">
+          <div className="size-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-4">
+            <AlertTriangle size={24} />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground mb-1">
+            {this.props.fallbackTitle ?? "Page Component Encountered an Error"}
+          </h2>
+          <p className="text-xs text-muted-foreground max-w-md mb-6 font-mono bg-background/50 p-3 rounded-lg border border-border/40 text-left overflow-x-auto">
+            {this.state.error?.message ?? "An unexpected rendering error occurred."}
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: 4,
-              padding: "8px 16px",
-              fontSize: 14,
-              fontWeight: 500,
-              borderRadius: 8,
-              border: "1px solid currentColor",
-              background: "transparent",
-              color: "inherit",
-              cursor: "pointer",
-            }}
-          >
-            Reload
-          </button>
+          <Button variant="outline" size="sm" onClick={this.handleRetry} className="gap-2 text-xs">
+            <RefreshCw size={12} />
+            Try Reloading Component
+          </Button>
         </div>
       );
     }
+
     return this.props.children;
   }
 }
-
